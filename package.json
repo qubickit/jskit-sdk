@@ -1,0 +1,49 @@
+{
+  "name": "@qubic-labs/sdk",
+  "version": "0.0.0-development",
+  "module": "./dist/index.js",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/qubickit/jskit-core.git",
+    "directory": "jskit-sdk"
+  },
+  "bugs": {
+    "url": "https://github.com/qubickit/jskit-core/issues"
+  },
+  "homepage": "https://github.com/qubickit/jskit-core/tree/main/jskit-sdk#readme",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "check": "biome check .",
+    "format": "biome format --write .",
+    "lint": "biome lint .",
+    "test": "bun test",
+    "prepack": "bun run build"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.3.11",
+    "@types/bun": "latest",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@qubic-labs/core": "file:../jskit-core"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist/",
+    "README.md"
+  ]
+}
