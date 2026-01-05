@@ -36,7 +36,11 @@ const sdk = createSdk({ baseUrl: "https://rpc.qubic.org" });
 const tickInfo = await sdk.rpc.live.tickInfo();
 const targetTick = await sdk.tick.getSuggestedTargetTick(); // currentTick + 15
 
-// later: build/sign txBytes (Uint8Array) using @qubic-labs/core
-// await sdk.tx.broadcastSigned(txBytes);
-// await sdk.tx.waitForConfirmation({ txId, targetTick });
+// transfer helper (builds using @qubic-labs/core under the hood)
+// const res = await sdk.transfers.sendAndConfirm({
+//   fromSeed,
+//   toIdentity,
+//   amount: 1n,
+//   targetTick,
+// });
 ```

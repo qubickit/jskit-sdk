@@ -16,6 +16,15 @@ export { createSdk } from "./src/sdk.js";
 export type { SuggestedTargetTickInput, TickHelpers, TickHelpersConfig } from "./src/tick.js";
 export { createTickHelpers } from "./src/tick.js";
 export type {
+  BuildSignedTransferInput,
+  SendAndConfirmInput,
+  SendTransferResult,
+  SignedTransfer,
+  TransferHelpers,
+  TransferHelpersConfig,
+} from "./src/transfers.js";
+export { createTransferHelpers } from "./src/transfers.js";
+export type {
   TxConfirmationHelpers,
   TxConfirmationHelpersConfig,
   WaitForConfirmationInput,
