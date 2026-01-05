@@ -43,6 +43,20 @@ export type SendTransactionResult = Readonly<{
   broadcast: BroadcastTransactionResult;
 }>;
 
+export class QueuedTransactionError extends Error {
+  override name = "QueuedTransactionError";
+
+  constructor(
+    message: string,
+    readonly details: Readonly<{
+      status: string;
+      error?: unknown;
+    }>,
+  ) {
+    super(message);
+  }
+}
+
 export type SendAndConfirmTransactionInput = BuildSignedTransactionInput &
   Readonly<{
     timeoutMs?: number;
@@ -124,7 +138,8 @@ export function createTransactionHelpers(config: TransactionHelpersConfig): Tran
       const queued = await txQueue.enqueue({
         sourceIdentity,
         targetTick: built.targetTick,
-        submit: async ({ signal: _signal }) => {
+        submit: async ({ signal }) => {
+          if (signal.aborted) throw new Error("aborted");
           const broadcast = await config.tx.broadcastSigned(built.txBytes);
           return { txId: broadcast.transactionId, result: broadcast };
         },
@@ -139,7 +154,10 @@ export function createTransactionHelpers(config: TransactionHelpersConfig): Tran
       });
 
       if (queued.status !== "confirmed") {
-        throw new Error(`Transaction queue finished with status ${queued.status}`);
+        throw new QueuedTransactionError("Transaction queue did not confirm", {
+          status: queued.status,
+          error: queued.error,
+        });
       }
       const broadcast = queued.result as BroadcastTransactionResult | undefined;
       if (!broadcast) throw new Error("Transaction queue missing broadcast result");

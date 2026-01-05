@@ -23,7 +23,7 @@ export type {
   TransactionHelpers,
   TransactionHelpersConfig,
 } from "./src/transactions.js";
-export { createTransactionHelpers } from "./src/transactions.js";
+export { createTransactionHelpers, QueuedTransactionError } from "./src/transactions.js";
 export type {
   BuildSignedTransferInput,
   SendAndConfirmInput,

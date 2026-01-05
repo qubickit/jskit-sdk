@@ -32,7 +32,12 @@ RPC client is available. Next: tx workflows (tick selection, TxQueue, broadcast+
 ```ts
 import { createSdk } from "@qubic-labs/sdk";
 
-const sdk = createSdk({ baseUrl: "https://rpc.qubic.org" });
+const sdk = createSdk({
+  baseUrl: "https://rpc.qubic.org",
+  tick: { defaultOffset: 15 }, // currentTick + 15
+  tx: { confirmTimeoutMs: 60_000, confirmPollIntervalMs: 1_000 },
+  txQueue: { enabled: true, policy: "waitForConfirm" },
+});
 const tickInfo = await sdk.rpc.live.tickInfo();
 const targetTick = await sdk.tick.getSuggestedTargetTick(); // currentTick + 15
 
