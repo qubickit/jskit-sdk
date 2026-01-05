@@ -1,17 +1,8 @@
-import {
-  buildSignedTransaction,
-  privateKeyFromSeed,
-  publicKeyFromIdentity,
-  publicKeyFromSeed,
-  transactionId,
-} from "@qubic-labs/core";
 import type { BroadcastTransactionResult } from "./rpc/client.js";
-import type { TickHelpers } from "./tick.js";
-import type { TxHelpers } from "./tx/tx.js";
+import type { TransactionHelpers } from "./transactions.js";
 
 export type TransferHelpersConfig = Readonly<{
-  tick: TickHelpers;
-  tx: TxHelpers;
+  transactions: TransactionHelpers;
 }>;
 
 export type BuildSignedTransferInput = Readonly<{
@@ -50,63 +41,48 @@ export type TransferHelpers = Readonly<{
 export function createTransferHelpers(config: TransferHelpersConfig): TransferHelpers {
   const helpers: TransferHelpers = {
     async buildSignedTransfer(input: BuildSignedTransferInput): Promise<SignedTransfer> {
-      const targetTick =
-        input.targetTick !== undefined
-          ? toBigint(input.targetTick)
-          : await config.tick.getSuggestedTargetTick();
-
-      const tickU32 = toU32Number(targetTick, "targetTick");
-      const sourcePublicKey32 = await publicKeyFromSeed(input.fromSeed);
-      const destinationPublicKey32 = publicKeyFromIdentity(input.toIdentity);
-      const secretKey32 = await privateKeyFromSeed(input.fromSeed);
-
-      const txBytes = await buildSignedTransaction(
-        {
-          sourcePublicKey32,
-          destinationPublicKey32,
-          amount: input.amount,
-          tick: tickU32,
-        },
-        secretKey32,
-      );
-      const txId = await transactionId(txBytes);
-      return { txBytes, txId, targetTick };
+      const built = await config.transactions.buildSigned({
+        fromSeed: input.fromSeed,
+        toIdentity: input.toIdentity,
+        amount: input.amount,
+        targetTick: input.targetTick,
+      });
+      return { txBytes: built.txBytes, txId: built.txId, targetTick: built.targetTick };
     },
 
     async send(input: BuildSignedTransferInput): Promise<SendTransferResult> {
-      const built = await helpers.buildSignedTransfer(input);
-      const broadcast = await config.tx.broadcastSigned(built.txBytes);
-      return { ...built, broadcast };
+      const sent = await config.transactions.send({
+        fromSeed: input.fromSeed,
+        toIdentity: input.toIdentity,
+        amount: input.amount,
+        targetTick: input.targetTick,
+      });
+      return {
+        txBytes: sent.txBytes,
+        txId: sent.txId,
+        targetTick: sent.targetTick,
+        broadcast: sent.broadcast,
+      };
     },
 
     async sendAndConfirm(input: SendAndConfirmInput): Promise<SendTransferResult> {
-      const built = await helpers.buildSignedTransfer(input);
-      const broadcast = await config.tx.broadcastSigned(built.txBytes);
-      await config.tx.waitForConfirmation({
-        txId: built.txId,
-        targetTick: built.targetTick,
+      const sent = await config.transactions.sendAndConfirm({
+        fromSeed: input.fromSeed,
+        toIdentity: input.toIdentity,
+        amount: input.amount,
+        targetTick: input.targetTick,
         timeoutMs: input.timeoutMs,
         pollIntervalMs: input.pollIntervalMs,
         signal: input.signal,
       });
-      return { ...built, broadcast };
+      return {
+        txBytes: sent.txBytes,
+        txId: sent.txId,
+        targetTick: sent.targetTick,
+        broadcast: sent.broadcast,
+      };
     },
   };
 
   return helpers;
-}
-
-function toBigint(value: bigint | number): bigint {
-  if (typeof value === "bigint") return value;
-  if (!Number.isFinite(value) || !Number.isInteger(value)) {
-    throw new TypeError("Expected an integer");
-  }
-  return BigInt(value);
-}
-
-function toU32Number(value: bigint, name: string): number {
-  if (value < 0n || value > 0xffff_ffffn) {
-    throw new RangeError(`${name} must fit in uint32`);
-  }
-  return Number(value);
 }

@@ -1,5 +1,6 @@
 import { createRpcClient } from "./rpc/client.js";
 import { createTickHelpers } from "./tick.js";
+import { createTransactionHelpers } from "./transactions.js";
 import { createTransferHelpers } from "./transfers.js";
 import { createTxHelpers } from "./tx/tx.js";
 
@@ -14,6 +15,7 @@ export function createSdk(config: SdkConfig = {}) {
   const rpc = createRpcClient({ baseUrl: config.baseUrl, fetch: config.fetch });
   const tick = createTickHelpers({ rpc });
   const tx = createTxHelpers({ rpc });
-  const transfers = createTransferHelpers({ tick, tx });
-  return { rpc, tick, tx, transfers } as const;
+  const transactions = createTransactionHelpers({ tick, tx });
+  const transfers = createTransferHelpers({ transactions });
+  return { rpc, tick, tx, transactions, transfers } as const;
 }

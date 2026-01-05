@@ -6,6 +6,7 @@ describe("sdk scaffold", () => {
     expect(createSdk()).toHaveProperty("rpc");
     expect(createSdk()).toHaveProperty("tx");
     expect(createSdk()).toHaveProperty("tick");
+    expect(createSdk()).toHaveProperty("transactions");
     expect(createSdk()).toHaveProperty("transfers");
   });
 });

@@ -16,6 +16,15 @@ export { createSdk } from "./src/sdk.js";
 export type { SuggestedTargetTickInput, TickHelpers, TickHelpersConfig } from "./src/tick.js";
 export { createTickHelpers } from "./src/tick.js";
 export type {
+  BuildSignedTransactionInput,
+  BuiltTransaction,
+  SendAndConfirmTransactionInput,
+  SendTransactionResult,
+  TransactionHelpers,
+  TransactionHelpersConfig,
+} from "./src/transactions.js";
+export { createTransactionHelpers } from "./src/transactions.js";
+export type {
   BuildSignedTransferInput,
   SendAndConfirmInput,
   SendTransferResult,

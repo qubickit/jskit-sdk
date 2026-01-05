@@ -36,7 +36,17 @@ const sdk = createSdk({ baseUrl: "https://rpc.qubic.org" });
 const tickInfo = await sdk.rpc.live.tickInfo();
 const targetTick = await sdk.tick.getSuggestedTargetTick(); // currentTick + 15
 
-// transfer helper (builds using @qubic-labs/core under the hood)
+// generic tx builder (inputType + inputBytes is future QBI integration point)
+// const tx = await sdk.transactions.buildSigned({
+//   fromSeed,
+//   toIdentity,
+//   amount: 1n,
+//   targetTick,
+//   inputType: 0,
+//   inputBytes: new Uint8Array(),
+// });
+
+// transfer helper (wraps sdk.transactions with inputType=0)
 // const res = await sdk.transfers.sendAndConfirm({
 //   fromSeed,
 //   toIdentity,
