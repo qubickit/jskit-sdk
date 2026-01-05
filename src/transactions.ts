@@ -1,5 +1,6 @@
 import {
   buildSignedTransaction,
+  identityFromSeed,
   privateKeyFromSeed,
   publicKeyFromIdentity,
   publicKeyFromSeed,
@@ -8,10 +9,12 @@ import {
 import type { BroadcastTransactionResult } from "./rpc/client.js";
 import type { TickHelpers } from "./tick.js";
 import type { TxHelpers } from "./tx/tx.js";
+import type { TxQueue } from "./tx/tx-queue.js";
 
 export type TransactionHelpersConfig = Readonly<{
   tick: TickHelpers;
   tx: TxHelpers;
+  txQueue?: TxQueue;
 }>;
 
 export type BuildSignedTransactionInput = Readonly<{
@@ -25,13 +28,17 @@ export type BuildSignedTransactionInput = Readonly<{
 
 export type BuiltTransaction = Readonly<{
   txBytes: Uint8Array;
+  /** Deterministic transaction id derived from tx bytes. */
   txId: string;
   targetTick: bigint;
 }>;
 
 export type SendTransactionResult = Readonly<{
   txBytes: Uint8Array;
+  /** Deterministic transaction id derived from tx bytes. */
   txId: string;
+  /** Transaction id returned by the RPC broadcast call (used for confirmation). */
+  networkTxId: string;
   targetTick: bigint;
   broadcast: BroadcastTransactionResult;
 }>;
@@ -47,6 +54,7 @@ export type TransactionHelpers = Readonly<{
   buildSigned(input: BuildSignedTransactionInput): Promise<BuiltTransaction>;
   send(input: BuildSignedTransactionInput): Promise<SendTransactionResult>;
   sendAndConfirm(input: SendAndConfirmTransactionInput): Promise<SendTransactionResult>;
+  sendQueued(input: SendAndConfirmTransactionInput): Promise<SendTransactionResult>;
 }>;
 
 export function createTransactionHelpers(config: TransactionHelpersConfig): TransactionHelpers {
@@ -80,20 +88,67 @@ export function createTransactionHelpers(config: TransactionHelpersConfig): Tran
     async send(input: BuildSignedTransactionInput): Promise<SendTransactionResult> {
       const built = await helpers.buildSigned(input);
       const broadcast = await config.tx.broadcastSigned(built.txBytes);
-      return { ...built, broadcast };
+      return {
+        ...built,
+        networkTxId: broadcast.transactionId,
+        broadcast,
+      };
     },
 
     async sendAndConfirm(input: SendAndConfirmTransactionInput): Promise<SendTransactionResult> {
+      if (config.txQueue) return helpers.sendQueued(input);
+
       const built = await helpers.buildSigned(input);
       const broadcast = await config.tx.broadcastSigned(built.txBytes);
       await config.tx.waitForConfirmation({
-        txId: built.txId,
+        txId: broadcast.transactionId,
         targetTick: built.targetTick,
         timeoutMs: input.timeoutMs,
         pollIntervalMs: input.pollIntervalMs,
         signal: input.signal,
       });
-      return { ...built, broadcast };
+      return {
+        ...built,
+        networkTxId: broadcast.transactionId,
+        broadcast,
+      };
+    },
+
+    async sendQueued(input: SendAndConfirmTransactionInput): Promise<SendTransactionResult> {
+      const txQueue = config.txQueue;
+      if (!txQueue) throw new Error("Transaction queue is not configured");
+
+      const sourceIdentity = await identityFromSeed(input.fromSeed);
+      const built = await helpers.buildSigned(input);
+
+      const queued = await txQueue.enqueue({
+        sourceIdentity,
+        targetTick: built.targetTick,
+        submit: async ({ signal: _signal }) => {
+          const broadcast = await config.tx.broadcastSigned(built.txBytes);
+          return { txId: broadcast.transactionId, result: broadcast };
+        },
+        confirm: ({ txId, targetTick, signal }) =>
+          config.tx.waitForConfirmation({
+            txId,
+            targetTick,
+            timeoutMs: input.timeoutMs,
+            pollIntervalMs: input.pollIntervalMs,
+            signal,
+          }),
+      });
+
+      if (queued.status !== "confirmed") {
+        throw new Error(`Transaction queue finished with status ${queued.status}`);
+      }
+      const broadcast = queued.result as BroadcastTransactionResult | undefined;
+      if (!broadcast) throw new Error("Transaction queue missing broadcast result");
+
+      return {
+        ...built,
+        networkTxId: broadcast.transactionId,
+        broadcast,
+      };
     },
   };
 

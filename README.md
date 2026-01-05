@@ -46,6 +46,15 @@ const targetTick = await sdk.tick.getSuggestedTargetTick(); // currentTick + 15
 //   inputBytes: new Uint8Array(),
 // });
 
+// queued send (enforces “one concurrent tx per source identity”)
+// const sent = await sdk.transactions.sendQueued({
+//   fromSeed,
+//   toIdentity,
+//   amount: 1n,
+//   targetTick,
+// });
+
+// `sendAndConfirm` uses the queue by default when available.
 // transfer helper (wraps sdk.transactions with inputType=0)
 // const res = await sdk.transfers.sendAndConfirm({
 //   fromSeed,

@@ -21,6 +21,7 @@ export type SignedTransfer = Readonly<{
 export type SendTransferResult = Readonly<{
   txBytes: Uint8Array;
   txId: string;
+  networkTxId: string;
   targetTick: bigint;
   broadcast: BroadcastTransactionResult;
 }>;
@@ -60,6 +61,7 @@ export function createTransferHelpers(config: TransferHelpersConfig): TransferHe
       return {
         txBytes: sent.txBytes,
         txId: sent.txId,
+        networkTxId: sent.networkTxId,
         targetTick: sent.targetTick,
         broadcast: sent.broadcast,
       };
@@ -78,6 +80,7 @@ export function createTransferHelpers(config: TransferHelpersConfig): TransferHe
       return {
         txBytes: sent.txBytes,
         txId: sent.txId,
+        networkTxId: sent.networkTxId,
         targetTick: sent.targetTick,
         broadcast: sent.broadcast,
       };

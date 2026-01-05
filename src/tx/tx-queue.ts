@@ -23,6 +23,7 @@ export type EnqueueTxInput<Result> = Readonly<{
   sourceIdentity: string;
   targetTick: bigint | number;
   submit: (input: { signal: AbortSignal }) => Promise<Readonly<{ txId: string; result: Result }>>;
+  confirm?: TxQueueConfirmFn;
 }>;
 
 export type TxQueueItem<Result> = Readonly<{
@@ -104,6 +105,7 @@ export class TxQueue {
     const active: ActiveItem<Result> = {
       item,
       controller,
+      confirm: input.confirm ?? this.#confirm,
       done: deferred.promise,
       supersede: () => {
         if (
@@ -148,7 +150,7 @@ export class TxQueue {
       item.result = submitted.result;
 
       item.status = "confirming";
-      await this.#confirm({
+      await active.confirm({
         txId: submitted.txId,
         targetTick: item.targetTick,
         signal: active.controller.signal,
@@ -178,6 +180,7 @@ type MutableTxQueueItem<Result> = {
 type ActiveItem<Result> = Readonly<{
   item: MutableTxQueueItem<Result>;
   controller: AbortController;
+  confirm: TxQueueConfirmFn;
   done: Promise<TxQueueItem<Result>>;
   supersede: () => void;
 }>;

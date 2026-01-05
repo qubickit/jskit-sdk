@@ -5,6 +5,7 @@ describe("sdk scaffold", () => {
   it("creates a sdk object", () => {
     expect(createSdk()).toHaveProperty("rpc");
     expect(createSdk()).toHaveProperty("tx");
+    expect(createSdk()).toHaveProperty("txQueue");
     expect(createSdk()).toHaveProperty("tick");
     expect(createSdk()).toHaveProperty("transactions");
     expect(createSdk()).toHaveProperty("transfers");
