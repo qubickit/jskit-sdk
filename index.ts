@@ -1,7 +1,9 @@
 export type {
   BroadcastTransactionResult,
+  ComputorList,
   LastProcessedTick,
   LiveBalance,
+  ProcessedTickInterval,
   QueryTransaction,
   RpcClient,
   RpcClientConfig,

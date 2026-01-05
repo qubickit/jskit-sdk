@@ -18,6 +18,7 @@
     "format": "biome format --write .",
     "lint": "biome lint .",
     "test": "bun test",
+    "examples:transfer": "bun run examples/transfer.ts",
     "prepack": "bun run build"
   },
   "devDependencies": {
@@ -44,6 +45,7 @@
   "types": "./dist/index.d.ts",
   "files": [
     "dist/",
+    "examples/",
     "README.md"
   ]
 }

@@ -57,6 +57,19 @@ export type LastProcessedTick = Readonly<{
   intervalInitialTick: bigint;
 }>;
 
+export type ProcessedTickInterval = Readonly<{
+  epoch: bigint;
+  firstTick: bigint;
+  lastTick: bigint;
+}>;
+
+export type ComputorList = Readonly<{
+  epoch: bigint;
+  tickNumber: bigint;
+  identities: readonly string[];
+  signature: string;
+}>;
+
 export type QueryTransaction = Readonly<{
   hash: string;
   amount: bigint;
@@ -126,6 +139,8 @@ export type RpcClient = Readonly<{
     ): Promise<TransactionsForIdentityResponse>;
     getTransactionsForTick(tickNumber: bigint | number): Promise<readonly QueryTransaction[]>;
     getTickData(tickNumber: bigint | number): Promise<TickData>;
+    getProcessedTickIntervals(): Promise<readonly ProcessedTickInterval[]>;
+    getComputorListsForEpoch(epoch: bigint | number): Promise<readonly ComputorList[]>;
   }>;
 }>;
 
@@ -324,6 +339,42 @@ export function createRpcClient(config: RpcClientConfig = {}): RpcClient {
         ),
         signature: expectString(tickData.signature, "tickData.signature"),
       };
+    },
+
+    async getProcessedTickIntervals(): Promise<readonly ProcessedTickInterval[]> {
+      const url = new URL("query/v1/getProcessedTickIntervals", base);
+      const json = await requestJson("GET", url);
+      const obj = expectObject(json);
+      const intervals = expectArray(obj.processedTickIntervals, "processedTickIntervals");
+      return intervals.map((i, idx) => {
+        const interval = expectObject(i, `processedTickIntervals[${idx}]`);
+        return {
+          epoch: parseJsonInteger(interval.epoch, `processedTickIntervals[${idx}].epoch`),
+          firstTick: parseJsonInteger(
+            interval.firstTick,
+            `processedTickIntervals[${idx}].firstTick`,
+          ),
+          lastTick: parseJsonInteger(interval.lastTick, `processedTickIntervals[${idx}].lastTick`),
+        };
+      });
+    },
+
+    async getComputorListsForEpoch(epoch: bigint | number): Promise<readonly ComputorList[]> {
+      const url = new URL("query/v1/getComputorListsForEpoch", base);
+      const json = await requestJson("POST", url, { epoch: toJsonInteger(epoch) });
+      const obj = expectObject(json);
+      const lists = expectArray(obj.computorsLists, "computorsLists");
+      return lists.map((l, idx) => {
+        const list = expectObject(l, `computorsLists[${idx}]`);
+        return {
+          epoch: parseJsonInteger(list.epoch, `computorsLists[${idx}].epoch`),
+          tickNumber: parseJsonInteger(list.tickNumber, `computorsLists[${idx}].tickNumber`),
+          identities: expectArray(list.identities, `computorsLists[${idx}].identities`).map(
+            (s, j) => expectString(s, `computorsLists[${idx}].identities[${j}]`),
+          ),
+          signature: expectString(list.signature, `computorsLists[${idx}].signature`),
+        };
+      });
     },
   } as const;
 

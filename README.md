@@ -27,6 +27,11 @@ bun add @qubic-labs/core@file:../jskit-core
 
 RPC client is available. Next: tx workflows (tick selection, TxQueue, broadcast+confirm helpers).
 
+## Public API
+
+- `createSdk()` is the main entrypoint.
+- Avoid deep imports (`src/...`) in apps; they’re not considered stable.
+
 ## Quick start
 
 ```ts
@@ -76,3 +81,11 @@ const targetTick = await sdk.tick.getSuggestedTargetTick(); // currentTick + 15
 //   targetTick,
 // });
 ```
+
+## Examples
+
+See `jskit-sdk/examples/README.md`.
+
+## Releasing
+
+See `jskit-sdk/docs/releasing.md`.
