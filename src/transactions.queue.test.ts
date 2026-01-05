@@ -36,6 +36,9 @@ describe("transactions (queued)", () => {
         if (!d) throw new Error(`missing deferred for ${txId}`);
         await d.promise;
       },
+      async waitForConfirmedTransaction() {
+        throw new Error("not implemented");
+      },
     };
 
     const txQueue = new TxQueue({

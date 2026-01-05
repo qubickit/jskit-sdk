@@ -29,6 +29,9 @@ describe("transfers", () => {
       async waitForConfirmation() {
         throw new Error("not used");
       },
+      async waitForConfirmedTransaction() {
+        throw new Error("not used");
+      },
     };
 
     const transactions = createTransactionHelpers({ tick, tx });
