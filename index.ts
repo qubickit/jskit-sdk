@@ -1,2 +1,26 @@
+export type {
+  BroadcastTransactionResult,
+  LastProcessedTick,
+  LiveBalance,
+  QueryTransaction,
+  RpcClient,
+  RpcClientConfig,
+  TickData,
+  TickInfo,
+  TransactionsForIdentityRequest,
+  TransactionsForIdentityResponse,
+} from "./src/rpc/client.js";
+export { createRpcClient, RpcError } from "./src/rpc/client.js";
 export type { SdkConfig } from "./src/sdk.js";
 export { createSdk } from "./src/sdk.js";
+export type { SuggestedTargetTickInput, TickHelpers, TickHelpersConfig } from "./src/tick.js";
+export { createTickHelpers } from "./src/tick.js";
+export type {
+  EnqueueTxInput,
+  TxQueueConfig,
+  TxQueueConfirmFn,
+  TxQueueItem,
+  TxQueueItemStatus,
+  TxQueuePolicy,
+} from "./src/tx/tx-queue.js";
+export { TxQueue, TxQueueError } from "./src/tx/tx-queue.js";

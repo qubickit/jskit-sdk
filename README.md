@@ -25,4 +25,14 @@ bun add @qubic-labs/core@file:../jskit-core
 
 ## Status
 
-Scaffolded. Next: add RPC client + workflows.
+RPC client is available. Next: tx workflows (tick selection, TxQueue, broadcast+confirm helpers).
+
+## Quick start
+
+```ts
+import { createSdk } from "@qubic-labs/sdk";
+
+const sdk = createSdk({ baseUrl: "https://rpc.qubic.org" });
+const tickInfo = await sdk.rpc.live.tickInfo();
+const targetTick = await sdk.tick.getSuggestedTargetTick(); // currentTick + 15
+```
