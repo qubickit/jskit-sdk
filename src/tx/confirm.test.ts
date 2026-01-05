@@ -61,6 +61,27 @@ describe("tx confirmation", () => {
     }
   });
 
+  it("returns the confirmed transaction (receipt)", async () => {
+    const server = createTestServer();
+    try {
+      const rpc = createRpcClient({ baseUrl: server.url.toString() });
+      const confirm = createTxConfirmationHelpers({
+        rpc,
+        defaultTimeoutMs: 5_000,
+        defaultPollIntervalMs: 1,
+      });
+      const tx = await confirm.waitForConfirmedTransaction({
+        txId: "tx",
+        targetTick: 10,
+        pollIntervalMs: 1,
+      });
+      expect(tx.hash).toBe("tx");
+      expect(tx.tickNumber).toBe(10n);
+    } finally {
+      server.stop(true);
+    }
+  });
+
   it("throws TxNotFoundError if target tick is reached but tx stays 404", async () => {
     const server = Bun.serve({
       port: 0,

@@ -6,7 +6,7 @@ import {
   publicKeyFromSeed,
   transactionId,
 } from "@qubic-labs/core";
-import type { BroadcastTransactionResult } from "./rpc/client.js";
+import type { BroadcastTransactionResult, QueryTransaction } from "./rpc/client.js";
 import type { TickHelpers } from "./tick.js";
 import type { TxHelpers } from "./tx/tx.js";
 import type { TxQueue } from "./tx/tx-queue.js";
@@ -43,6 +43,11 @@ export type SendTransactionResult = Readonly<{
   broadcast: BroadcastTransactionResult;
 }>;
 
+export type SendTransactionReceipt = SendTransactionResult &
+  Readonly<{
+    confirmedTransaction: QueryTransaction;
+  }>;
+
 export class QueuedTransactionError extends Error {
   override name = "QueuedTransactionError";
 
@@ -69,6 +74,7 @@ export type TransactionHelpers = Readonly<{
   send(input: BuildSignedTransactionInput): Promise<SendTransactionResult>;
   sendAndConfirm(input: SendAndConfirmTransactionInput): Promise<SendTransactionResult>;
   sendQueued(input: SendAndConfirmTransactionInput): Promise<SendTransactionResult>;
+  sendAndConfirmWithReceipt(input: SendAndConfirmTransactionInput): Promise<SendTransactionReceipt>;
 }>;
 
 export function createTransactionHelpers(config: TransactionHelpersConfig): TransactionHelpers {
@@ -126,6 +132,20 @@ export function createTransactionHelpers(config: TransactionHelpersConfig): Tran
         networkTxId: broadcast.transactionId,
         broadcast,
       };
+    },
+
+    async sendAndConfirmWithReceipt(
+      input: SendAndConfirmTransactionInput,
+    ): Promise<SendTransactionReceipt> {
+      const sent = await helpers.sendAndConfirm(input);
+      const confirmedTransaction = await config.tx.waitForConfirmedTransaction({
+        txId: sent.networkTxId,
+        targetTick: sent.targetTick,
+        timeoutMs: input.timeoutMs,
+        pollIntervalMs: input.pollIntervalMs,
+        signal: input.signal,
+      });
+      return { ...sent, confirmedTransaction };
     },
 
     async sendQueued(input: SendAndConfirmTransactionInput): Promise<SendTransactionResult> {

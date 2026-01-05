@@ -67,4 +67,12 @@ const targetTick = await sdk.tick.getSuggestedTargetTick(); // currentTick + 15
 //   amount: 1n,
 //   targetTick,
 // });
+
+// confirmation receipt (returns QueryTransaction from the archive)
+// const receipt = await sdk.transfers.sendAndConfirmWithReceipt({
+//   fromSeed,
+//   toIdentity,
+//   amount: 1n,
+//   targetTick,
+// });
 ```

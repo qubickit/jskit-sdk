@@ -19,6 +19,7 @@ export type {
   BuildSignedTransactionInput,
   BuiltTransaction,
   SendAndConfirmTransactionInput,
+  SendTransactionReceipt,
   SendTransactionResult,
   TransactionHelpers,
   TransactionHelpersConfig,
@@ -27,6 +28,7 @@ export { createTransactionHelpers, QueuedTransactionError } from "./src/transact
 export type {
   BuildSignedTransferInput,
   SendAndConfirmInput,
+  SendTransferReceipt,
   SendTransferResult,
   SignedTransfer,
   TransferHelpers,

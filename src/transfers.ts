@@ -1,4 +1,4 @@
-import type { BroadcastTransactionResult } from "./rpc/client.js";
+import type { BroadcastTransactionResult, QueryTransaction } from "./rpc/client.js";
 import type { TransactionHelpers } from "./transactions.js";
 
 export type TransferHelpersConfig = Readonly<{
@@ -26,6 +26,11 @@ export type SendTransferResult = Readonly<{
   broadcast: BroadcastTransactionResult;
 }>;
 
+export type SendTransferReceipt = SendTransferResult &
+  Readonly<{
+    confirmedTransaction: QueryTransaction;
+  }>;
+
 export type SendAndConfirmInput = BuildSignedTransferInput &
   Readonly<{
     timeoutMs?: number;
@@ -37,6 +42,7 @@ export type TransferHelpers = Readonly<{
   buildSignedTransfer(input: BuildSignedTransferInput): Promise<SignedTransfer>;
   send(input: BuildSignedTransferInput): Promise<SendTransferResult>;
   sendAndConfirm(input: SendAndConfirmInput): Promise<SendTransferResult>;
+  sendAndConfirmWithReceipt(input: SendAndConfirmInput): Promise<SendTransferReceipt>;
 }>;
 
 export function createTransferHelpers(config: TransferHelpersConfig): TransferHelpers {
@@ -83,6 +89,26 @@ export function createTransferHelpers(config: TransferHelpersConfig): TransferHe
         networkTxId: sent.networkTxId,
         targetTick: sent.targetTick,
         broadcast: sent.broadcast,
+      };
+    },
+
+    async sendAndConfirmWithReceipt(input: SendAndConfirmInput): Promise<SendTransferReceipt> {
+      const sent = await config.transactions.sendAndConfirmWithReceipt({
+        fromSeed: input.fromSeed,
+        toIdentity: input.toIdentity,
+        amount: input.amount,
+        targetTick: input.targetTick,
+        timeoutMs: input.timeoutMs,
+        pollIntervalMs: input.pollIntervalMs,
+        signal: input.signal,
+      });
+      return {
+        txBytes: sent.txBytes,
+        txId: sent.txId,
+        networkTxId: sent.networkTxId,
+        targetTick: sent.targetTick,
+        broadcast: sent.broadcast,
+        confirmedTransaction: sent.confirmedTransaction,
       };
     },
   };
