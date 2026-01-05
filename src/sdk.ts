@@ -1,5 +1,6 @@
 import { createRpcClient } from "./rpc/client.js";
 import { createTickHelpers } from "./tick.js";
+import { createTxHelpers } from "./tx/tx.js";
 
 export type SdkConfig = Readonly<{
   /** Partner RPC base URL (recommended: `https://rpc.qubic.org`). */
@@ -11,5 +12,6 @@ export type SdkConfig = Readonly<{
 export function createSdk(config: SdkConfig = {}) {
   const rpc = createRpcClient({ baseUrl: config.baseUrl, fetch: config.fetch });
   const tick = createTickHelpers({ rpc });
-  return { rpc, tick } as const;
+  const tx = createTxHelpers({ rpc });
+  return { rpc, tick, tx } as const;
 }

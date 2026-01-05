@@ -16,6 +16,19 @@ export { createSdk } from "./src/sdk.js";
 export type { SuggestedTargetTickInput, TickHelpers, TickHelpersConfig } from "./src/tick.js";
 export { createTickHelpers } from "./src/tick.js";
 export type {
+  TxConfirmationHelpers,
+  TxConfirmationHelpersConfig,
+  WaitForConfirmationInput,
+} from "./src/tx/confirm.js";
+export {
+  createTxConfirmationHelpers,
+  TxConfirmationAbortedError,
+  TxConfirmationTimeoutError,
+  TxNotFoundError,
+} from "./src/tx/confirm.js";
+export type { TxHelpers, TxHelpersConfig } from "./src/tx/tx.js";
+export { createTxHelpers } from "./src/tx/tx.js";
+export type {
   EnqueueTxInput,
   TxQueueConfig,
   TxQueueConfirmFn,
