@@ -26,7 +26,7 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
-    "@qubic-labs/core": "file:../jskit-core"
+    "@qubic-labs/core": "^1.0.0"
   },
   "peerDependencies": {
     "typescript": "^5"
