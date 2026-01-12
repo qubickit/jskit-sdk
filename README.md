@@ -109,6 +109,7 @@ const targetTick = await sdk.tick.getSuggestedTargetTick(); // currentTick + 15
 // import qutil from "./qbi/QUtil.qbi" assert { type: "json" };
 // const sdkWithQbi = createSdk({ baseUrl: "https://rpc.qubic.org", qbi: { files: [qutil] } });
 // const fees = await sdkWithQbi.qbi?.contract("QUtil").query("GetFees", { inputBytes: new Uint8Array([0]) });
+// queryValue returns decoded outputs when codecs are configured (see docs).
 ```
 
 ## Docs

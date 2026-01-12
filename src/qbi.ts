@@ -36,10 +36,54 @@ export type QbiRegistryInput = Readonly<{
   files: readonly QbiFile[];
 }>;
 
-export type QbiQueryInput = Readonly<{
+export type QbiCodec<Input = unknown, Output = unknown> = Readonly<{
+  encode(entry: QbiEntry, value: Input): Uint8Array;
+  decode(entry: QbiEntry, bytes: Uint8Array): Output;
+}>;
+
+type QbiCodecLike = Readonly<{
+  encode(entry: QbiEntry, value: unknown): Uint8Array;
+  decode(entry: QbiEntry, bytes: Uint8Array): unknown;
+}>;
+
+export type QbiContractCodecs = Readonly<{
+  functions?: Readonly<Record<string, QbiCodecLike>>;
+  procedures?: Readonly<Record<string, QbiCodecLike>>;
+}>;
+
+export type QbiCodecRegistry = Readonly<Record<string, QbiContractCodecs>>;
+
+type QbiFunctionCodecs<C> = C extends { functions?: infer F } ? F : undefined;
+type QbiProcedureCodecs<C> = C extends { procedures?: infer P } ? P : undefined;
+type QbiCodecInput<T> = T extends { encode(entry: QbiEntry, value: infer Input): Uint8Array }
+  ? Input
+  : unknown;
+type QbiCodecOutput<T> = T extends { decode(entry: QbiEntry, bytes: Uint8Array): infer Output }
+  ? Output
+  : unknown;
+
+type QbiFunctionInput<C, Name extends string> = QbiFunctionCodecs<C> extends Record<string, unknown>
+  ? Name extends keyof QbiFunctionCodecs<C>
+    ? QbiCodecInput<QbiFunctionCodecs<C>[Name]>
+    : unknown
+  : unknown;
+
+type QbiFunctionOutput<C, Name extends string> = QbiFunctionCodecs<C> extends Record<string, unknown>
+  ? Name extends keyof QbiFunctionCodecs<C>
+    ? QbiCodecOutput<QbiFunctionCodecs<C>[Name]>
+    : unknown
+  : unknown;
+
+type QbiProcedureInput<C, Name extends string> = QbiProcedureCodecs<C> extends Record<string, unknown>
+  ? Name extends keyof QbiProcedureCodecs<C>
+    ? QbiCodecInput<QbiProcedureCodecs<C>[Name]>
+    : unknown
+  : unknown;
+
+export type QbiQueryInput<Input = unknown, Output = unknown> = Readonly<{
   inputBytes?: Uint8Array;
-  inputValue?: unknown;
-  codec?: QbiCodec;
+  inputValue?: Input;
+  codec?: QbiCodec<Input, Output>;
   expectedOutputSize?: number;
   retries?: number;
   retryDelayMs?: number;
@@ -47,54 +91,77 @@ export type QbiQueryInput = Readonly<{
   allowSizeMismatch?: boolean;
 }>;
 
-export type QbiHelpersConfig = Readonly<{
+export type QbiQueryResult<Output = unknown> = QueryRawResult & Readonly<{ decoded?: Output }>;
+
+export type QbiHelpersConfig<TCodecs extends QbiCodecRegistry | undefined = undefined> = Readonly<{
   contracts: ContractsHelpers;
   registry: QbiRegistry;
   transactions?: TransactionHelpers;
+  codecs?: TCodecs;
 }>;
 
-export type QbiContractHandle = Readonly<{
-  contract: QbiFile["contract"];
-  getEntry(kind: QbiEntry["kind"], name: string): QbiEntry;
-  query(name: string, input: QbiQueryInput): Promise<QueryRawResult>;
-  decodeOutput(name: string, outputBytes: Uint8Array, codec: QbiCodec): unknown;
-  prepareProcedure(
-    name: string,
-    inputBytes: Uint8Array,
-  ): Readonly<{
-    contractIndex: number;
-    inputType: number;
-    inputBytes: Uint8Array;
+export type QbiContractHandle<CCodecs extends QbiContractCodecs | undefined = undefined> =
+  Readonly<{
+    contract: QbiFile["contract"];
+    getEntry(kind: QbiEntry["kind"], name: string): QbiEntry;
+    query<Name extends string>(
+      name: Name,
+      input: QbiQueryInput<QbiFunctionInput<CCodecs, Name>, QbiFunctionOutput<CCodecs, Name>>,
+    ): Promise<QbiQueryResult<QbiFunctionOutput<CCodecs, Name>>>;
+    queryValue<Name extends string>(
+      name: Name,
+      input: QbiQueryInput<QbiFunctionInput<CCodecs, Name>, QbiFunctionOutput<CCodecs, Name>>,
+    ): Promise<QbiFunctionOutput<CCodecs, Name>>;
+    decodeOutput<Name extends string>(
+      name: Name,
+      outputBytes: Uint8Array,
+      codec?: QbiCodec<QbiFunctionInput<CCodecs, Name>, QbiFunctionOutput<CCodecs, Name>>,
+    ): QbiFunctionOutput<CCodecs, Name>;
+    prepareProcedure(
+      name: string,
+      inputBytes: Uint8Array,
+    ): Readonly<{
+      contractIndex: number;
+      inputType: number;
+      inputBytes: Uint8Array;
+    }>;
+    buildProcedureTransaction<Name extends string>(
+      input: QbiProcedureTxInput<QbiProcedureInput<CCodecs, Name>> & { name: Name },
+    ): Promise<BuiltTransaction>;
+    sendProcedure<Name extends string>(
+      input: QbiProcedureTxInput<QbiProcedureInput<CCodecs, Name>> & { name: Name },
+    ): Promise<SendTransactionResult>;
+    sendProcedureAndConfirm<Name extends string>(
+      input: QbiProcedureTxInput<QbiProcedureInput<CCodecs, Name>> &
+        SendAndConfirmTransactionInput & { name: Name },
+    ): Promise<SendTransactionResult>;
+    sendProcedureAndConfirmWithReceipt<Name extends string>(
+      input: QbiProcedureTxInput<QbiProcedureInput<CCodecs, Name>> &
+        SendAndConfirmTransactionInput & { name: Name },
+    ): Promise<SendTransactionReceipt>;
   }>;
-  buildProcedureTransaction(input: QbiProcedureTxInput): Promise<BuiltTransaction>;
-  sendProcedure(input: QbiProcedureTxInput): Promise<SendTransactionResult>;
-  sendProcedureAndConfirm(
-    input: QbiProcedureTxInput & SendAndConfirmTransactionInput,
-  ): Promise<SendTransactionResult>;
-  sendProcedureAndConfirmWithReceipt(
-    input: QbiProcedureTxInput & SendAndConfirmTransactionInput,
-  ): Promise<SendTransactionReceipt>;
-}>;
 
-export type QbiHelpers = Readonly<{
+export type QbiHelpers<TCodecs extends QbiCodecRegistry | undefined = undefined> = Readonly<{
+  contract<Name extends keyof NonNullable<TCodecs> & string>(
+    name: Name,
+  ): QbiContractHandle<NonNullable<TCodecs>[Name]>;
   contract(nameOrIndex: string | number): QbiContractHandle;
   hasContract(nameOrIndex: string | number): boolean;
 }>;
 
-export type QbiCodec = Readonly<{
-  encode(entry: QbiEntry, value: unknown): Uint8Array;
-  decode(entry: QbiEntry, bytes: Uint8Array): unknown;
-}>;
-
-export type QbiProcedureTxInput = Readonly<{
+export type QbiProcedureTxInput<Input = unknown> = Readonly<{
   name: string;
   fromSeed: string;
   amount?: bigint;
   targetTick?: bigint | number;
   inputBytes?: Uint8Array;
-  inputValue?: unknown;
-  codec?: QbiCodec;
+  inputValue?: Input;
+  codec?: QbiCodec<Input, unknown>;
 }>;
+
+export function defineQbiCodecs<TCodecs>(codecs: TCodecs & QbiCodecRegistry): TCodecs {
+  return codecs;
+}
 
 export function createQbiRegistry(input: QbiRegistryInput): QbiRegistry {
   const byName = new Map<string, QbiFile>();
@@ -110,7 +177,13 @@ export function createQbiRegistry(input: QbiRegistryInput): QbiRegistry {
   return { byName, byIndex };
 }
 
-export function createQbiHelpers(config: QbiHelpersConfig): QbiHelpers {
+export function createQbiHelpers(config: QbiHelpersConfig): QbiHelpers;
+export function createQbiHelpers<TCodecs extends QbiCodecRegistry>(
+  config: QbiHelpersConfig<TCodecs> & { codecs: TCodecs },
+): QbiHelpers<TCodecs>;
+export function createQbiHelpers<TCodecs extends QbiCodecRegistry | undefined = undefined>(
+  config: QbiHelpersConfig<TCodecs>,
+): QbiHelpers<TCodecs> {
   const { contracts, registry } = config;
 
   const getContract = (nameOrIndex: string | number): QbiFile => {
@@ -125,17 +198,33 @@ export function createQbiHelpers(config: QbiHelpersConfig): QbiHelpers {
   };
 
   const toHandle = (file: QbiFile): QbiContractHandle => {
+    const contractCodecs = config.codecs?.[file.contract.name];
     const findEntry = (kind: QbiEntry["kind"], name: string): QbiEntry => {
       const entry = file.entries.find((e) => e.kind === kind && e.name === name);
       if (!entry) throw new Error(`Unknown ${kind}: ${file.contract.name}.${name}`);
       return entry;
     };
 
-    const getProcedureInputBytes = (entry: QbiEntry, input: QbiQueryInput): Uint8Array => {
+    const resolveCodec = <Input, Output>(
+      kind: QbiEntry["kind"],
+      name: string,
+      provided?: QbiCodec<Input, Output>,
+    ): QbiCodec<Input, Output> | undefined => {
+      if (provided) return provided;
+      const group = kind === "function" ? contractCodecs?.functions : contractCodecs?.procedures;
+      const codec = group?.[name] as QbiCodec<Input, Output> | undefined;
+      return codec;
+    };
+
+    const getInputBytes = <Input, Output>(
+      entry: QbiEntry,
+      input: QbiQueryInput<Input, Output>,
+      codec?: QbiCodec<Input, Output>,
+    ): Uint8Array => {
       if (input.inputBytes) return input.inputBytes;
       if (input.inputValue !== undefined) {
-        if (!input.codec) throw new Error("QBI codec is required for inputValue");
-        return input.codec.encode(entry, input.inputValue);
+        if (!codec) throw new Error("QBI codec is required for inputValue");
+        return codec.encode(entry, input.inputValue);
       }
       throw new Error("QBI inputBytes or inputValue is required");
     };
@@ -155,13 +244,14 @@ export function createQbiHelpers(config: QbiHelpersConfig): QbiHelpers {
     return {
       contract: file.contract,
       getEntry: findEntry,
-      async query(name: string, input: QbiQueryInput): Promise<QueryRawResult> {
+      async query(name: string, input: QbiQueryInput): Promise<QbiQueryResult> {
         const entry = findEntry("function", name);
         if (!file.contract.contractIndex && file.contract.contractIndex !== 0) {
           throw new Error(`Contract index missing for ${file.contract.name}`);
         }
 
-        const inputBytes = getProcedureInputBytes(entry, input);
+        const codec = resolveCodec("function", name, input.codec);
+        const inputBytes = getInputBytes(entry, input, codec);
         if (
           entry.inputSize !== undefined &&
           entry.inputSize !== inputBytes.byteLength &&
@@ -172,7 +262,7 @@ export function createQbiHelpers(config: QbiHelpersConfig): QbiHelpers {
           );
         }
 
-        return contracts.queryRaw({
+        const result = await contracts.queryRaw({
           contractIndex: file.contract.contractIndex,
           inputType: entry.inputType,
           inputBytes,
@@ -181,10 +271,51 @@ export function createQbiHelpers(config: QbiHelpersConfig): QbiHelpers {
           retryDelayMs: input.retryDelayMs,
           signal: input.signal,
         });
+        if (codec) {
+          return {
+            ...result,
+            decoded: codec.decode(entry, result.responseBytes),
+          };
+        }
+        return result;
       },
-      decodeOutput(name: string, outputBytes: Uint8Array, codec: QbiCodec): unknown {
+      async queryValue(name: string, input: QbiQueryInput): Promise<unknown> {
         const entry = findEntry("function", name);
-        return codec.decode(entry, outputBytes);
+        if (!file.contract.contractIndex && file.contract.contractIndex !== 0) {
+          throw new Error(`Contract index missing for ${file.contract.name}`);
+        }
+        const codec = resolveCodec("function", name, input.codec);
+        if (!codec) {
+          throw new Error(`QBI codec missing for ${file.contract.name}.${name}`);
+        }
+        const inputBytes = getInputBytes(entry, input, codec);
+        if (
+          entry.inputSize !== undefined &&
+          entry.inputSize !== inputBytes.byteLength &&
+          !input.allowSizeMismatch
+        ) {
+          throw new RangeError(
+            `Input size mismatch: expected ${entry.inputSize}, got ${inputBytes.byteLength}`,
+          );
+        }
+        const result = await contracts.queryRaw({
+          contractIndex: file.contract.contractIndex,
+          inputType: entry.inputType,
+          inputBytes,
+          expectedOutputSize: input.expectedOutputSize ?? entry.outputSize,
+          retries: input.retries,
+          retryDelayMs: input.retryDelayMs,
+          signal: input.signal,
+        });
+        return codec.decode(entry, result.responseBytes);
+      },
+      decodeOutput(name: string, outputBytes: Uint8Array, codec?: QbiCodec): unknown {
+        const entry = findEntry("function", name);
+        const resolved = resolveCodec("function", name, codec);
+        if (!resolved) {
+          throw new Error(`QBI codec missing for ${file.contract.name}.${name}`);
+        }
+        return resolved.decode(entry, outputBytes);
       },
       prepareProcedure(name: string, inputBytes: Uint8Array) {
         const entry = findEntry("procedure", name);
@@ -205,11 +336,15 @@ export function createQbiHelpers(config: QbiHelpersConfig): QbiHelpers {
       async buildProcedureTransaction(input: QbiProcedureTxInput): Promise<BuiltTransaction> {
         if (!config.transactions) throw new Error("QBI transactions helper is not configured");
         const entry = findEntry("procedure", input.name);
-        const inputBytes = getProcedureInputBytes(entry, {
-          inputBytes: input.inputBytes,
-          inputValue: input.inputValue,
-          codec: input.codec,
-        });
+        const codec = resolveCodec("procedure", input.name, input.codec);
+        const inputBytes = getInputBytes(
+          entry,
+          {
+            inputBytes: input.inputBytes,
+            inputValue: input.inputValue,
+          },
+          codec,
+        );
         const toIdentity = getContractIdentity();
         return config.transactions.buildSigned({
           fromSeed: input.fromSeed,
@@ -223,11 +358,15 @@ export function createQbiHelpers(config: QbiHelpersConfig): QbiHelpers {
       async sendProcedure(input: QbiProcedureTxInput): Promise<SendTransactionResult> {
         if (!config.transactions) throw new Error("QBI transactions helper is not configured");
         const entry = findEntry("procedure", input.name);
-        const inputBytes = getProcedureInputBytes(entry, {
-          inputBytes: input.inputBytes,
-          inputValue: input.inputValue,
-          codec: input.codec,
-        });
+        const codec = resolveCodec("procedure", input.name, input.codec);
+        const inputBytes = getInputBytes(
+          entry,
+          {
+            inputBytes: input.inputBytes,
+            inputValue: input.inputValue,
+          },
+          codec,
+        );
         const toIdentity = getContractIdentity();
         return config.transactions.send({
           fromSeed: input.fromSeed,
@@ -243,11 +382,15 @@ export function createQbiHelpers(config: QbiHelpersConfig): QbiHelpers {
       ): Promise<SendTransactionResult> {
         if (!config.transactions) throw new Error("QBI transactions helper is not configured");
         const entry = findEntry("procedure", input.name);
-        const inputBytes = getProcedureInputBytes(entry, {
-          inputBytes: input.inputBytes,
-          inputValue: input.inputValue,
-          codec: input.codec,
-        });
+        const codec = resolveCodec("procedure", input.name, input.codec);
+        const inputBytes = getInputBytes(
+          entry,
+          {
+            inputBytes: input.inputBytes,
+            inputValue: input.inputValue,
+          },
+          codec,
+        );
         const toIdentity = getContractIdentity();
         return config.transactions.sendAndConfirm({
           fromSeed: input.fromSeed,
@@ -266,11 +409,15 @@ export function createQbiHelpers(config: QbiHelpersConfig): QbiHelpers {
       ): Promise<SendTransactionReceipt> {
         if (!config.transactions) throw new Error("QBI transactions helper is not configured");
         const entry = findEntry("procedure", input.name);
-        const inputBytes = getProcedureInputBytes(entry, {
-          inputBytes: input.inputBytes,
-          inputValue: input.inputValue,
-          codec: input.codec,
-        });
+        const codec = resolveCodec("procedure", input.name, input.codec);
+        const inputBytes = getInputBytes(
+          entry,
+          {
+            inputBytes: input.inputBytes,
+            inputValue: input.inputValue,
+          },
+          codec,
+        );
         const toIdentity = getContractIdentity();
         return config.transactions.sendAndConfirmWithReceipt({
           fromSeed: input.fromSeed,
@@ -287,10 +434,11 @@ export function createQbiHelpers(config: QbiHelpersConfig): QbiHelpers {
     };
   };
 
+  const contract = ((nameOrIndex: string | number) =>
+    toHandle(getContract(nameOrIndex))) as QbiHelpers<TCodecs>["contract"];
+
   return {
-    contract(nameOrIndex: string | number): QbiContractHandle {
-      return toHandle(getContract(nameOrIndex));
-    },
+    contract,
     hasContract(nameOrIndex: string | number): boolean {
       return typeof nameOrIndex === "number"
         ? registry.byIndex.has(nameOrIndex)

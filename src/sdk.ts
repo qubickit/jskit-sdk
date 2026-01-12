@@ -2,7 +2,7 @@ import { createAssetsHelpers } from "./assets.js";
 import { createBobClient } from "./bob/client.js";
 import { createContractHelpers } from "./contracts.js";
 import type { FetchLike } from "./http.js";
-import { createQbiHelpers, createQbiRegistry } from "./qbi.js";
+import { createQbiHelpers, createQbiRegistry, type QbiCodecRegistry, type QbiFile } from "./qbi.js";
 import { createRpcClient } from "./rpc/client.js";
 import { createTickHelpers } from "./tick.js";
 import { createTransactionHelpers } from "./transactions.js";
@@ -38,21 +38,8 @@ export type SdkConfig = Readonly<{
     requestAssets?: (request: Uint8Array, signal?: AbortSignal) => Promise<readonly Uint8Array[]>;
   }>;
   qbi?: Readonly<{
-    files?: readonly Readonly<{
-      contract: Readonly<{
-        name: string;
-        contractIndex?: number;
-        contractPublicKeyHex?: string;
-        contractId?: string;
-      }>;
-      entries: readonly Readonly<{
-        kind: "function" | "procedure";
-        name: string;
-        inputType: number;
-        inputSize?: number;
-        outputSize?: number;
-      }>[];
-    }>[];
+    files?: readonly QbiFile[];
+    codecs?: QbiCodecRegistry;
   }>;
   bob?: Readonly<{
     baseUrl?: string;
@@ -97,11 +84,18 @@ export function createSdk(config: SdkConfig = {}) {
     ? createAssetsHelpers({ requestAssets: config.assets.requestAssets })
     : undefined;
   const qbi = config.qbi?.files
-    ? createQbiHelpers({
-        contracts,
-        registry: createQbiRegistry({ files: config.qbi.files }),
-        transactions,
-      })
+    ? config.qbi.codecs
+      ? createQbiHelpers({
+          contracts,
+          registry: createQbiRegistry({ files: config.qbi.files }),
+          transactions,
+          codecs: config.qbi.codecs,
+        })
+      : createQbiHelpers({
+          contracts,
+          registry: createQbiRegistry({ files: config.qbi.files }),
+          transactions,
+        })
     : undefined;
   const bob = createBobClient({
     baseUrl: config.bob?.baseUrl,

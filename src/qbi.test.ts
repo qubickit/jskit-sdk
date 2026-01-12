@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import type { ContractsHelpers } from "./contracts.js";
-import { createQbiHelpers, createQbiRegistry } from "./qbi.js";
+import { createQbiHelpers, createQbiRegistry, defineQbiCodecs } from "./qbi.js";
 
 describe("qbi helpers", () => {
   it("resolves entries and uses outputSize for queryRaw", async () => {
@@ -93,5 +93,57 @@ describe("qbi helpers", () => {
     });
 
     expect(built.txId).toBe("tx");
+  });
+
+  it("encodes inputs and decodes outputs with registry codecs", async () => {
+    let lastInputBytes: Uint8Array | undefined;
+
+    const contracts: ContractsHelpers = {
+      async queryRaw(input) {
+        lastInputBytes = input.inputBytes;
+        return {
+          responseBytes: new Uint8Array([9]),
+          responseBase64: "CQ==",
+          attempts: 1,
+        };
+      },
+      async querySmartContract() {
+        throw new Error("not used");
+      },
+    };
+
+    const registry = createQbiRegistry({
+      files: [
+        {
+          contract: { name: "QX", contractIndex: 1 },
+          entries: [
+            { kind: "function", name: "GetFees", inputType: 1, inputSize: 1, outputSize: 1 },
+          ],
+        },
+      ],
+    });
+
+    const codecs = defineQbiCodecs({
+      QX: {
+        functions: {
+          GetFees: {
+            encode(_entry: unknown, value: { flag: number }) {
+              return new Uint8Array([value.flag]);
+            },
+            decode(_entry: unknown, bytes: Uint8Array) {
+              return { fee: bytes[0] ?? 0 };
+            },
+          },
+        },
+      },
+    });
+
+    const qbi = createQbiHelpers({ contracts, registry, codecs });
+    const res = await qbi.contract("QX").query("GetFees", { inputValue: { flag: 7 } });
+    expect(lastInputBytes?.[0]).toBe(7);
+    expect(res.decoded?.fee).toBe(9);
+
+    const fee = await qbi.contract("QX").queryValue("GetFees", { inputValue: { flag: 1 } });
+    expect(fee.fee).toBe(9);
   });
 });

@@ -9,7 +9,7 @@ If you need to generate QBI files from Qubic headers, use `@qubic-labs/qbi`.
 Bun/Node can load JSON QBI files directly. Examples below load files from disk so you control the registry version that your app uses.
 
 ```ts
-import { createSdk } from "@qubic-labs/sdk";
+import { createSdk, defineQbiCodecs } from "@qubic-labs/sdk";
 
 const qbiFile = await Bun.file("./registry/QUtil.qbi").json();
 
@@ -58,24 +58,37 @@ Procedure helpers require `transactions` to be configured in the SDK (the defaul
 
 ## Add a codec for typed inputs/outputs
 
-You can provide a codec to encode/decode values instead of passing raw bytes. This is especially useful once the QBI schema is stable.
+You can provide codecs to encode/decode values instead of passing raw bytes. The SDK will use them automatically when `inputValue` is provided and will decode responses into `decoded` (or `queryValue`).
 
 ```ts
-const codec = {
-  encode(entry, value) {
-    if (entry.name !== "GetFees") throw new Error("Unsupported entry");
-    return new Uint8Array([0]);
+const codecs = defineQbiCodecs({
+  QUtil: {
+    functions: {
+      GetFees: {
+        encode(_entry, _value: {}) {
+          return new Uint8Array([0]);
+        },
+        decode(_entry, bytes) {
+          return { raw: bytes };
+        },
+      },
+    },
   },
-  decode(entry, bytes) {
-    if (entry.name !== "GetFees") throw new Error("Unsupported entry");
-    return bytes;
-  },
-};
-
-const response = await qbi.contract("QUtil").query("GetFees", {
-  inputValue: {},
-  codec,
 });
+
+const sdk = createSdk({
+  baseUrl: "https://rpc.qubic.org",
+  qbi: { files: [qbiFile], codecs },
+});
+
+const res = await sdk.qbi?.contract("QUtil").query("GetFees", { inputValue: {} });
+console.log(res?.decoded);
+```
+
+If you want only the typed value:
+
+```ts
+const fees = await sdk.qbi?.contract("QUtil").queryValue("GetFees", { inputValue: {} });
 ```
 
 ## Registry tips
