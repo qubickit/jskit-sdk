@@ -1,6 +1,7 @@
 export default {
   branches: ["main"],
-  tagFormat: `v${version}`,
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: semantic-release replaces ${version}.
+  tagFormat: "v${version}",
   plugins: [
     [
       "@semantic-release/commit-analyzer",
@@ -31,7 +32,8 @@ export default {
       "@semantic-release/git",
       {
         assets: ["package.json", "bun.lock", "CHANGELOG.md"],
-        message: `chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}`,
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: semantic-release replaces ${nextRelease.*}.
+        message: "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}",
       },
     ],
   ],
