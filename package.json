@@ -5,13 +5,12 @@
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/qubickit/jskit-core.git",
-    "directory": "jskit-sdk"
+    "url": "git+https://github.com/qubickit/jskit-sdk.git"
   },
   "bugs": {
-    "url": "https://github.com/qubickit/jskit-core/issues"
+    "url": "https://github.com/qubickit/jskit-sdk/issues"
   },
-  "homepage": "https://github.com/qubickit/jskit-core/tree/main/jskit-sdk#readme",
+  "homepage": "https://github.com/qubickit/jskit-sdk#readme",
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "check": "biome check .",
