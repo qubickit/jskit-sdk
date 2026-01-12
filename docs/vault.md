@@ -5,13 +5,15 @@ The seed vault stores one or more seeds in an encrypted JSON file protected by a
 ## Create or open a vault
 
 ```ts
-import { openSeedVault } from "@qubic-labs/sdk";
+import { createSdk, openSeedVault } from "@qubic-labs/sdk";
 
 const vault = await openSeedVault({
   path: "./vault.json",
   passphrase: process.env.VAULT_PASSPHRASE ?? "dev-passphrase",
   create: true,
 });
+
+const sdk = createSdk({ baseUrl: "https://rpc.qubic.org", vault });
 ```
 
 ## Add and fetch seeds
@@ -23,6 +25,17 @@ const seed = await vault.getSeed("main");
 const seedByIdentity = await vault.getSeed("IDENTITY60...");
 
 console.log(vault.list());
+```
+
+Using the vault with SDK helpers:
+
+```ts
+const fromSeed = await vault.getSeed("main");
+await sdk.transfers.sendAndConfirm({
+  fromSeed,
+  toIdentity: "DESTINATION_IDENTITY",
+  amount: 1n,
+});
 ```
 
 ## Rotate the passphrase
