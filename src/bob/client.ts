@@ -7,7 +7,13 @@ export type BobClientConfig = Readonly<{
   headers?: Readonly<Record<string, string>>;
   onRequest?: (info: Readonly<{ url: string; method: string; body?: unknown }>) => void;
   onResponse?: (
-    info: Readonly<{ url: string; method: string; status: number; ok: boolean; durationMs: number }>,
+    info: Readonly<{
+      url: string;
+      method: string;
+      status: number;
+      ok: boolean;
+      durationMs: number;
+    }>,
   ) => void;
   onError?: (error: BobError) => void;
 }>;
@@ -214,7 +220,9 @@ export function createBobClient(config: BobClientConfig = {}): BobClient {
       return requestJson("POST", url, input);
     },
 
-    async querySmartContract(input: BobQuerySmartContractInput): Promise<BobQuerySmartContractResult> {
+    async querySmartContract(
+      input: BobQuerySmartContractInput,
+    ): Promise<BobQuerySmartContractResult> {
       const nonce = input.nonce ?? randomUint32();
       const dataHex = input.dataHex ?? (input.dataBytes ? toHex(input.dataBytes) : "");
       const url = new URL("querySmartContract", base);
@@ -335,7 +343,7 @@ function randomUint32(): number {
   if (typeof crypto !== "undefined" && "getRandomValues" in crypto) {
     const buf = new Uint32Array(1);
     crypto.getRandomValues(buf);
-    return buf[0]!;
+    return buf[0] ?? 0;
   }
   return Math.floor(Math.random() * 0xffff_ffff);
 }

@@ -11,7 +11,13 @@ export type RpcClientConfig = Readonly<{
   headers?: Readonly<Record<string, string>>;
   onRequest?: (info: Readonly<{ url: string; method: string; body?: unknown }>) => void;
   onResponse?: (
-    info: Readonly<{ url: string; method: string; status: number; ok: boolean; durationMs: number }>,
+    info: Readonly<{
+      url: string;
+      method: string;
+      status: number;
+      ok: boolean;
+      durationMs: number;
+    }>,
   ) => void;
   onError?: (error: RpcError) => void;
 }>;

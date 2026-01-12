@@ -68,8 +68,11 @@ describe("assets helpers", () => {
     });
 
     expect(res.length).toBe(1);
-    expect("siblings" in res[0]!).toBe(true);
-    const record = res[0]!.asset;
+    const first = res[0];
+    expect(first).toBeDefined();
+    if (!first) throw new Error("Missing assets response");
+    expect("siblings" in first).toBe(true);
+    const record = first.asset;
     expect(record.type).toBe(AssetRecordType.OWNERSHIP);
   });
 

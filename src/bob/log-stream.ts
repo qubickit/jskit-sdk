@@ -66,7 +66,7 @@ export function createLogStream(config: LogStreamConfig): LogStream {
     open = true;
     for (const text of pending.splice(0, pending.length)) socket.send(text);
     config.onOpen?.();
-    if (config.subscriptions && config.subscriptions.length) {
+    if (config.subscriptions?.length) {
       bootstrapSubscriptions(config.subscriptions);
     }
   };
@@ -112,7 +112,9 @@ export function createLogStream(config: LogStreamConfig): LogStream {
       scIndex: sub.scIndex,
       logType: sub.logType,
       ...(sub.lastLogId !== undefined ? { lastLogId: sub.lastLogId } : {}),
-      ...(sub.lastTick !== undefined && sub.lastLogId === undefined ? { lastTick: sub.lastTick } : {}),
+      ...(sub.lastTick !== undefined && sub.lastLogId === undefined
+        ? { lastTick: sub.lastTick }
+        : {}),
     });
   };
 
@@ -154,7 +156,9 @@ export function createLogStream(config: LogStreamConfig): LogStream {
       withCursor.push({ ...s, ...cursor });
     }
 
-    const hasPerCursor = withCursor.some((s) => s.lastLogId !== undefined || s.lastTick !== undefined);
+    const hasPerCursor = withCursor.some(
+      (s) => s.lastLogId !== undefined || s.lastTick !== undefined,
+    );
     if (!hasPerCursor && withCursor.length > 1) {
       subscribeMany(withCursor, {
         lastLogId: config.lastLogId,
@@ -235,4 +239,3 @@ export type WebSocketLike = {
 export type EventLike = Readonly<Record<string, unknown>>;
 export type MessageEventLike = Readonly<{ data: string }>;
 export type CloseEventLike = Readonly<{ code?: number; reason?: string }>;
-

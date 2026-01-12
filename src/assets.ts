@@ -1,5 +1,5 @@
 import {
-  AssetRecord,
+  type AssetRecord,
   AssetRecordType,
   decodeRespondAssets,
   decodeRespondAssetsWithSiblings,
@@ -56,14 +56,18 @@ export type ListPossessedInput = AssetsQueryInput &
   }>;
 
 export type AssetsHelpers = Readonly<{
-  listIssued(input: ListIssuedInput): Promise<readonly (RespondAssets | RespondAssetsWithSiblings)[]>;
+  listIssued(
+    input: ListIssuedInput,
+  ): Promise<readonly (RespondAssets | RespondAssetsWithSiblings)[]>;
   listOwned(input: ListOwnedInput): Promise<readonly (RespondAssets | RespondAssetsWithSiblings)[]>;
   listPossessed(
     input: ListPossessedInput,
   ): Promise<readonly (RespondAssets | RespondAssetsWithSiblings)[]>;
-  listByUniverseIndex(input: { universeIndex: number; getSiblings?: boolean; signal?: AbortSignal }): Promise<
-    readonly (RespondAssets | RespondAssetsWithSiblings)[]
-  >;
+  listByUniverseIndex(input: {
+    universeIndex: number;
+    getSiblings?: boolean;
+    signal?: AbortSignal;
+  }): Promise<readonly (RespondAssets | RespondAssetsWithSiblings)[]>;
 }>;
 
 export function createAssetsHelpers(config: AssetsHelpersConfig): AssetsHelpers {

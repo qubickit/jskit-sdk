@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { createRpcClient } from "./rpc/client.js";
 import { createContractHelpers } from "./contracts.js";
+import { createRpcClient } from "./rpc/client.js";
 
 function createQueryFetch(responses: Uint8Array[]) {
   let calls = 0;

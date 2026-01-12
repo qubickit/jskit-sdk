@@ -13,4 +13,3 @@ export class SdkError extends Error {
     this.cause = cause;
   }
 }
-

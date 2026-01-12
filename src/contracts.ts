@@ -42,7 +42,9 @@ export function createContractHelpers(config: ContractsHelpersConfig): Contracts
   const defaultRetryDelayMs = config.defaultRetryDelayMs ?? 1_000;
 
   return {
-    async querySmartContract(input): Promise<{ responseBytes: Uint8Array; responseBase64: string }> {
+    async querySmartContract(
+      input,
+    ): Promise<{ responseBytes: Uint8Array; responseBase64: string }> {
       return config.rpc.live.querySmartContract(input);
     },
 
@@ -51,8 +53,7 @@ export function createContractHelpers(config: ContractsHelpersConfig): Contracts
       const retryDelayMs = input.retryDelayMs ?? defaultRetryDelayMs;
       const expectedOutputSize = input.expectedOutputSize;
       const inputBytes =
-        input.inputBytes ??
-        (input.inputBase64 ? decodeBase64(input.inputBase64) : undefined);
+        input.inputBytes ?? (input.inputBase64 ? decodeBase64(input.inputBase64) : undefined);
       if (!inputBytes) {
         throw new TypeError("queryRaw requires inputBytes or inputBase64");
       }

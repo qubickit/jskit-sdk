@@ -39,7 +39,9 @@ describe("log stream", () => {
       webSocketFactory: (url) => new FakeWebSocket(url),
     });
 
-    const socket = FakeWebSocket.instances[0]!;
+    const socket = FakeWebSocket.instances[0];
+    expect(socket).toBeDefined();
+    if (!socket) throw new Error("Missing test WebSocket instance");
     socket.open();
     await new Promise((resolve) => setTimeout(resolve, 0));
 
