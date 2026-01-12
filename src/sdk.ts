@@ -80,7 +80,7 @@ export function createSdk(config: SdkConfig = {}) {
             tx.waitForConfirmation({ txId, targetTick, signal }),
         });
 
-  const transactions = createTransactionHelpers({ tick, tx, txQueue });
+  const transactions = createTransactionHelpers({ tick, tx, txQueue, vault: config.vault });
   const transfers = createTransferHelpers({ transactions });
   const assets = config.assets?.requestAssets
     ? createAssetsHelpers({ requestAssets: config.assets.requestAssets })

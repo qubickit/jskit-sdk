@@ -36,6 +36,12 @@ await sdk.transfers.sendAndConfirm({
   toIdentity: "DESTINATION_IDENTITY",
   amount: 1n,
 });
+
+await sdk.transfers.sendAndConfirm({
+  fromVault: "main",
+  toIdentity: "DESTINATION_IDENTITY",
+  amount: 1n,
+});
 ```
 
 ## Rotate the passphrase
@@ -44,10 +50,29 @@ await sdk.transfers.sendAndConfirm({
 await vault.rotatePassphrase("new-passphrase");
 ```
 
+## Import/export
+
+```ts
+const backup = vault.exportJson();
+await vault.importEncrypted(backup, { mode: "merge", sourcePassphrase: "secret" });
+```
+
+## CLI
+
+```bash
+qubic-vault init --path ./vault.json --passphrase "secret"
+qubic-vault add --path ./vault.json --passphrase "secret" --name main --seed "..."
+qubic-vault list --path ./vault.json --passphrase "secret"
+qubic-vault rotate --path ./vault.json --passphrase "secret" --new-passphrase "next"
+qubic-vault export --path ./vault.json --passphrase "secret" --out vault-backup.json
+qubic-vault import --path ./vault.json --passphrase "secret" --file vault-backup.json --mode merge
+```
+
 ## Notes
 
 - The vault uses scrypt (KDF) + AES-256-GCM for encryption.
 - You can tune scrypt parameters via `openSeedVault({ kdfParams: { N, r, p, dkLen } })`.
 - Each entry has its own nonce and auth tag.
+- Vault files are locked by default (`.lock` file). Disable with `openSeedVault({ lock: false })`.
 - Writes are atomic (`.tmp` then rename).
 - Use a strong passphrase and keep the vault file in a secure location.

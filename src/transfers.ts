@@ -1,16 +1,16 @@
 import type { BroadcastTransactionResult, QueryTransaction } from "./rpc/client.js";
-import type { TransactionHelpers } from "./transactions.js";
+import type { SeedSourceInput, TransactionHelpers } from "./transactions.js";
 
 export type TransferHelpersConfig = Readonly<{
   transactions: TransactionHelpers;
 }>;
 
-export type BuildSignedTransferInput = Readonly<{
-  fromSeed: string;
-  toIdentity: string;
-  amount: bigint;
-  targetTick?: bigint | number;
-}>;
+export type BuildSignedTransferInput = SeedSourceInput &
+  Readonly<{
+    toIdentity: string;
+    amount: bigint;
+    targetTick?: bigint | number;
+  }>;
 
 export type SignedTransfer = Readonly<{
   txBytes: Uint8Array;
@@ -49,7 +49,7 @@ export function createTransferHelpers(config: TransferHelpersConfig): TransferHe
   const helpers: TransferHelpers = {
     async buildSignedTransfer(input: BuildSignedTransferInput): Promise<SignedTransfer> {
       const built = await config.transactions.buildSigned({
-        fromSeed: input.fromSeed,
+        ...input,
         toIdentity: input.toIdentity,
         amount: input.amount,
         targetTick: input.targetTick,
@@ -59,7 +59,7 @@ export function createTransferHelpers(config: TransferHelpersConfig): TransferHe
 
     async send(input: BuildSignedTransferInput): Promise<SendTransferResult> {
       const sent = await config.transactions.send({
-        fromSeed: input.fromSeed,
+        ...input,
         toIdentity: input.toIdentity,
         amount: input.amount,
         targetTick: input.targetTick,
@@ -75,7 +75,7 @@ export function createTransferHelpers(config: TransferHelpersConfig): TransferHe
 
     async sendAndConfirm(input: SendAndConfirmInput): Promise<SendTransferResult> {
       const sent = await config.transactions.sendAndConfirm({
-        fromSeed: input.fromSeed,
+        ...input,
         toIdentity: input.toIdentity,
         amount: input.amount,
         targetTick: input.targetTick,
@@ -94,7 +94,7 @@ export function createTransferHelpers(config: TransferHelpersConfig): TransferHe
 
     async sendAndConfirmWithReceipt(input: SendAndConfirmInput): Promise<SendTransferReceipt> {
       const sent = await config.transactions.sendAndConfirmWithReceipt({
-        fromSeed: input.fromSeed,
+        ...input,
         toIdentity: input.toIdentity,
         amount: input.amount,
         targetTick: input.targetTick,

@@ -47,6 +47,9 @@
   "publishConfig": {
     "access": "public"
   },
+  "bin": {
+    "qubic-vault": "./dist/src/vault-cli.js"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

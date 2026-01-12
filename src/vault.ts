@@ -1,5 +1,5 @@
 import { createCipheriv, createDecipheriv, randomBytes, scrypt } from "node:crypto";
-import { access, readFile, rename, writeFile } from "node:fs/promises";
+import { access, open, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { identityFromSeed } from "@qubic-labs/core";
 
 const scryptAsync = (
@@ -69,6 +69,8 @@ export type VaultSummary = Readonly<{
 
 type VaultFile = VaultHeader & Readonly<{ entries: readonly VaultEntry[] }>;
 
+export type VaultExport = VaultFile;
+
 export class VaultError extends Error {
   constructor(message: string) {
     super(message);
@@ -108,13 +110,22 @@ export type SeedVault = Readonly<{
   path: string;
   list(): readonly VaultSummary[];
   getEntry(ref: string): VaultEntry;
+  getIdentity(ref: string): string;
   getSeed(ref: string): Promise<string>;
   addSeed(
     input: Readonly<{ name: string; seed: string; seedIndex?: number; overwrite?: boolean }>,
   ): Promise<VaultSummary>;
   remove(ref: string): Promise<void>;
   rotatePassphrase(newPassphrase: string): Promise<void>;
+  exportEncrypted(): VaultExport;
+  exportJson(): string;
+  importEncrypted(
+    input: VaultExport | string,
+    options?: Readonly<{ mode?: "merge" | "replace"; sourcePassphrase?: string }>,
+  ): Promise<void>;
+  getSeedSource(ref: string): Promise<Readonly<{ fromSeed: string }>>;
   save(): Promise<void>;
+  close(): Promise<void>;
 }>;
 
 export type OpenSeedVaultInput = Readonly<{
@@ -122,6 +133,8 @@ export type OpenSeedVaultInput = Readonly<{
   passphrase: string;
   create?: boolean;
   autoSave?: boolean;
+  lock?: boolean;
+  lockTimeoutMs?: number;
   kdfParams?: Readonly<{
     N?: number;
     r?: number;
@@ -133,16 +146,33 @@ export type OpenSeedVaultInput = Readonly<{
 export async function openSeedVault(input: OpenSeedVaultInput): Promise<SeedVault> {
   const { path, passphrase } = input;
   const autoSave = input.autoSave ?? true;
+  const lockEnabled = input.lock ?? true;
+  const lockTimeoutMs = input.lockTimeoutMs ?? 0;
+  const lockPath = `${path}.lock`;
 
   let file: VaultFile | undefined;
+  let lockHandle: Awaited<ReturnType<typeof open>> | undefined;
+  let closed = false;
 
   try {
-    const raw = await readFile(path, "utf8");
-    file = parseVaultFile(raw);
-  } catch (error) {
-    if (!input.create || !isNotFoundError(error)) {
-      throw new VaultNotFoundError(path);
+    if (lockEnabled) {
+      lockHandle = await acquireLock(lockPath, lockTimeoutMs);
     }
+
+    try {
+      const raw = await readFile(path, "utf8");
+      file = parseVaultFile(raw);
+    } catch (error) {
+      if (!isNotFoundError(error)) {
+        throw error;
+      }
+      if (!input.create) {
+        throw new VaultNotFoundError(path);
+      }
+    }
+  } catch (error) {
+    await releaseLock(lockHandle, lockPath);
+    throw error;
   }
 
   if (!file) {
@@ -155,7 +185,7 @@ export async function openSeedVault(input: OpenSeedVaultInput): Promise<SeedVaul
     throw new VaultError(`Unsupported vault version: ${file.vaultVersion}`);
   }
 
-  const key = await deriveKey(passphrase, file.kdf.params);
+  let key = await deriveKey(passphrase, file.kdf.params);
   const entries = new Map(file.entries.map((entry) => [entry.name, entry]));
 
   const findEntry = (ref: string): VaultEntry => {
@@ -234,6 +264,10 @@ export async function openSeedVault(input: OpenSeedVaultInput): Promise<SeedVaul
     }
   };
 
+  const getIdentity = (ref: string): string => {
+    return findEntry(ref).identity;
+  };
+
   const remove = async (ref: string): Promise<void> => {
     const entry = findEntry(ref);
     entries.delete(entry.name);
@@ -259,18 +293,82 @@ export async function openSeedVault(input: OpenSeedVaultInput): Promise<SeedVaul
       kdf: { name: "scrypt", params },
       entries: Array.from(entries.values()),
     };
+    key = nextKey;
     await writeVaultFile(path, file);
   };
+
+  const exportEncrypted = (): VaultExport => {
+    if (!file) throw new VaultError("Vault not initialized");
+    return { ...file, entries: Array.from(entries.values()) };
+  };
+
+  const exportJson = (): string => {
+    return JSON.stringify(exportEncrypted(), null, 2);
+  };
+
+  const importEncrypted = async (
+    inputExport: VaultExport | string,
+    options?: Readonly<{ mode?: "merge" | "replace"; sourcePassphrase?: string }>,
+  ): Promise<void> => {
+    const source = typeof inputExport === "string" ? parseVaultFile(inputExport) : inputExport;
+    const sourceKey = await deriveKey(options?.sourcePassphrase ?? passphrase, source.kdf.params);
+    const mode = options?.mode ?? "merge";
+    const now = new Date().toISOString();
+
+    const nextEntries = mode === "replace" ? new Map<string, VaultEntry>() : new Map(entries);
+
+    for (const entry of source.entries) {
+      const seed = decryptSeed(entry.encrypted, sourceKey);
+      const encrypted = encryptSeed(seed, key);
+      nextEntries.set(entry.name, {
+        name: entry.name,
+        identity: entry.identity,
+        seedIndex: entry.seedIndex,
+        createdAt: entry.createdAt,
+        updatedAt: now,
+        encrypted,
+      });
+    }
+
+    entries.clear();
+    for (const [name, entry] of nextEntries.entries()) {
+      entries.set(name, entry);
+    }
+    if (autoSave) await save();
+  };
+
+  const getSeedSource = async (ref: string): Promise<Readonly<{ fromSeed: string }>> => {
+    const fromSeed = await getSeed(ref);
+    return { fromSeed };
+  };
+
+  const close = async (): Promise<void> => {
+    if (closed) return;
+    closed = true;
+    await releaseLock(lockHandle, lockPath);
+  };
+
+  if (lockHandle) {
+    registerExitHandler(async () => {
+      await releaseLock(lockHandle, lockPath);
+    });
+  }
 
   return {
     path,
     list,
     getEntry: findEntry,
+    getIdentity,
     getSeed,
     addSeed,
     remove,
     rotatePassphrase,
+    exportEncrypted,
+    exportJson,
+    importEncrypted,
+    getSeedSource,
     save,
+    close,
   };
 }
 
@@ -362,5 +460,60 @@ export async function vaultExists(path: string): Promise<boolean> {
     return true;
   } catch {
     return false;
+  }
+}
+
+async function acquireLock(
+  path: string,
+  timeoutMs: number,
+): Promise<Awaited<ReturnType<typeof open>>> {
+  const start = Date.now();
+  const retryMs = 200;
+  while (true) {
+    try {
+      const handle = await open(path, "wx");
+      await handle.writeFile(
+        JSON.stringify({ pid: process.pid, createdAt: new Date().toISOString() }, null, 2),
+        "utf8",
+      );
+      return handle;
+    } catch (error) {
+      if (!isLockExistsError(error)) throw error;
+      if (timeoutMs <= 0 || Date.now() - start >= timeoutMs) {
+        throw new VaultError(`Vault is locked: ${path}`);
+      }
+      await new Promise((resolve) => setTimeout(resolve, retryMs));
+    }
+  }
+}
+
+async function releaseLock(
+  handle: Awaited<ReturnType<typeof open>> | undefined,
+  path: string,
+): Promise<void> {
+  if (!handle) return;
+  try {
+    await handle.close();
+  } finally {
+    await unlink(path).catch(() => undefined);
+  }
+}
+
+function isLockExistsError(error: unknown): boolean {
+  if (!error || typeof error !== "object" || !("code" in error)) return false;
+  const code = (error as { code?: unknown }).code;
+  return typeof code === "string" && code === "EEXIST";
+}
+
+const exitHandlers = new Set<() => Promise<void>>();
+
+function registerExitHandler(fn: () => Promise<void>): void {
+  exitHandlers.add(fn);
+  if (exitHandlers.size === 1) {
+    process.on("exit", () => {
+      for (const handler of exitHandlers) {
+        handler().catch(() => undefined);
+      }
+    });
   }
 }

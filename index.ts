@@ -77,6 +77,7 @@ export { createTickHelpers } from "./src/tick.js";
 export type {
   BuildSignedTransactionInput,
   BuiltTransaction,
+  SeedSourceInput,
   SendAndConfirmTransactionInput,
   SendTransactionReceipt,
   SendTransactionResult,
@@ -120,6 +121,7 @@ export type {
   OpenSeedVaultInput,
   SeedVault,
   VaultEntry,
+  VaultExport,
   VaultSummary,
 } from "./src/vault.js";
 export {

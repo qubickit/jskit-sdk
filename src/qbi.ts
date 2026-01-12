@@ -2,6 +2,7 @@ import { identityFromPublicKey } from "@qubic-labs/core";
 import type { ContractsHelpers, QueryRawResult } from "./contracts.js";
 import type {
   BuiltTransaction,
+  SeedSourceInput,
   SendAndConfirmTransactionInput,
   SendTransactionReceipt,
   SendTransactionResult,
@@ -155,15 +156,15 @@ export type QbiHelpers<TCodecs extends QbiCodecRegistry | undefined = undefined>
   hasContract(nameOrIndex: string | number): boolean;
 }>;
 
-export type QbiProcedureTxInput<Input = unknown> = Readonly<{
-  name: string;
-  fromSeed: string;
-  amount?: bigint;
-  targetTick?: bigint | number;
-  inputBytes?: Uint8Array;
-  inputValue?: Input;
-  codec?: QbiCodec<Input, unknown>;
-}>;
+export type QbiProcedureTxInput<Input = unknown> = SeedSourceInput &
+  Readonly<{
+    name: string;
+    amount?: bigint;
+    targetTick?: bigint | number;
+    inputBytes?: Uint8Array;
+    inputValue?: Input;
+    codec?: QbiCodec<Input, unknown>;
+  }>;
 
 export function defineQbiCodecs<TCodecs>(codecs: TCodecs & QbiCodecRegistry): TCodecs {
   return codecs;
@@ -352,8 +353,9 @@ export function createQbiHelpers<TCodecs extends QbiCodecRegistry | undefined = 
           codec,
         );
         const toIdentity = getContractIdentity();
+        const seedSource = toSeedSource(input);
         return config.transactions.buildSigned({
-          fromSeed: input.fromSeed,
+          ...seedSource,
           toIdentity,
           amount: input.amount ?? 0n,
           targetTick: input.targetTick,
@@ -374,8 +376,9 @@ export function createQbiHelpers<TCodecs extends QbiCodecRegistry | undefined = 
           codec,
         );
         const toIdentity = getContractIdentity();
+        const seedSource = toSeedSource(input);
         return config.transactions.send({
-          fromSeed: input.fromSeed,
+          ...seedSource,
           toIdentity,
           amount: input.amount ?? 0n,
           targetTick: input.targetTick,
@@ -398,8 +401,9 @@ export function createQbiHelpers<TCodecs extends QbiCodecRegistry | undefined = 
           codec,
         );
         const toIdentity = getContractIdentity();
+        const seedSource = toSeedSource(input);
         return config.transactions.sendAndConfirm({
-          fromSeed: input.fromSeed,
+          ...seedSource,
           toIdentity,
           amount: input.amount ?? 0n,
           targetTick: input.targetTick,
@@ -425,8 +429,9 @@ export function createQbiHelpers<TCodecs extends QbiCodecRegistry | undefined = 
           codec,
         );
         const toIdentity = getContractIdentity();
+        const seedSource = toSeedSource(input);
         return config.transactions.sendAndConfirmWithReceipt({
-          fromSeed: input.fromSeed,
+          ...seedSource,
           toIdentity,
           amount: input.amount ?? 0n,
           targetTick: input.targetTick,
@@ -451,6 +456,12 @@ export function createQbiHelpers<TCodecs extends QbiCodecRegistry | undefined = 
         : registry.byName.has(nameOrIndex);
     },
   };
+}
+
+function toSeedSource(input: SeedSourceInput): SeedSourceInput {
+  return "fromSeed" in input && typeof input.fromSeed === "string"
+    ? { fromSeed: input.fromSeed }
+    : { fromVault: input.fromVault };
 }
 
 function hexToBytes(hex: string): Uint8Array {

@@ -65,4 +65,82 @@ describe("transactions", () => {
     expect(built.txBytes).toEqual(expected);
     expect(built.txId).toBe(expectedId);
   });
+
+  it("accepts fromVault source inputs", async () => {
+    const seed = "jvhbyzjinlyutyuhsweuxiwootqoevjqwqmdhjeohrytxjxidpbcfyg";
+    const toIdentity = "AFZPUAIYVPNUYGJRQVLUKOPPVLHAZQTGLYAAUUNBXFTVTAMSBKQBLEIEPCVJ";
+
+    const tick: TickHelpers = {
+      async getSuggestedTargetTick() {
+        return 123n;
+      },
+    };
+    const tx: TxHelpers = {
+      async broadcastSigned() {
+        throw new Error("not used");
+      },
+      async waitForConfirmation() {
+        throw new Error("not used");
+      },
+      async waitForConfirmedTransaction() {
+        throw new Error("not used");
+      },
+    };
+
+    const transactions = createTransactionHelpers({
+      tick,
+      tx,
+      vault: {
+        path: "vault.json",
+        list() {
+          return [];
+        },
+        getEntry() {
+          throw new Error("not used");
+        },
+        getIdentity() {
+          return "IDENTITY";
+        },
+        async getSeed() {
+          return seed;
+        },
+        async addSeed() {
+          throw new Error("not used");
+        },
+        async remove() {
+          throw new Error("not used");
+        },
+        async rotatePassphrase() {
+          throw new Error("not used");
+        },
+        exportEncrypted() {
+          throw new Error("not used");
+        },
+        exportJson() {
+          throw new Error("not used");
+        },
+        async importEncrypted() {
+          throw new Error("not used");
+        },
+        async getSeedSource() {
+          return { fromSeed: seed };
+        },
+        async save() {
+          throw new Error("not used");
+        },
+        async close() {
+          throw new Error("not used");
+        },
+      },
+    });
+
+    const built = await transactions.buildSigned({
+      fromVault: "main",
+      toIdentity,
+      amount: 1n,
+      targetTick: 123n,
+    });
+
+    expect(built.txBytes.length).toBeGreaterThan(0);
+  });
 });

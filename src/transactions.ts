@@ -10,21 +10,27 @@ import type { BroadcastTransactionResult, QueryTransaction } from "./rpc/client.
 import type { TickHelpers } from "./tick.js";
 import type { TxHelpers } from "./tx/tx.js";
 import type { TxQueue } from "./tx/tx-queue.js";
+import type { SeedVault } from "./vault.js";
 
 export type TransactionHelpersConfig = Readonly<{
   tick: TickHelpers;
   tx: TxHelpers;
   txQueue?: TxQueue;
+  vault?: SeedVault;
 }>;
 
-export type BuildSignedTransactionInput = Readonly<{
-  fromSeed: string;
-  toIdentity: string;
-  amount: bigint;
-  targetTick?: bigint | number;
-  inputType?: number;
-  inputBytes?: Uint8Array;
-}>;
+export type SeedSourceInput =
+  | Readonly<{ fromSeed: string; fromVault?: never }>
+  | Readonly<{ fromVault: string; fromSeed?: never }>;
+
+export type BuildSignedTransactionInput = SeedSourceInput &
+  Readonly<{
+    toIdentity: string;
+    amount: bigint;
+    targetTick?: bigint | number;
+    inputType?: number;
+    inputBytes?: Uint8Array;
+  }>;
 
 export type BuiltTransaction = Readonly<{
   txBytes: Uint8Array;
@@ -86,9 +92,10 @@ export function createTransactionHelpers(config: TransactionHelpersConfig): Tran
           : await config.tick.getSuggestedTargetTick();
 
       const tickU32 = toU32Number(targetTick, "targetTick");
-      const sourcePublicKey32 = await publicKeyFromSeed(input.fromSeed);
+      const seed = await resolveSeed(input, config.vault);
+      const sourcePublicKey32 = await publicKeyFromSeed(seed);
       const destinationPublicKey32 = publicKeyFromIdentity(input.toIdentity);
-      const secretKey32 = await privateKeyFromSeed(input.fromSeed);
+      const secretKey32 = await privateKeyFromSeed(seed);
 
       const txBytes = await buildSignedTransaction(
         {
@@ -152,7 +159,7 @@ export function createTransactionHelpers(config: TransactionHelpersConfig): Tran
       const txQueue = config.txQueue;
       if (!txQueue) throw new Error("Transaction queue is not configured");
 
-      const sourceIdentity = await identityFromSeed(input.fromSeed);
+      const sourceIdentity = await resolveSourceIdentity(input, config.vault);
       const built = await helpers.buildSigned(input);
 
       const queued = await txQueue.enqueue({
@@ -191,6 +198,24 @@ export function createTransactionHelpers(config: TransactionHelpersConfig): Tran
   };
 
   return helpers;
+}
+
+async function resolveSeed(input: SeedSourceInput, vault?: SeedVault): Promise<string> {
+  if (hasFromSeed(input)) return input.fromSeed;
+  if (!vault) throw new Error("Vault is not configured");
+  return vault.getSeed(input.fromVault);
+}
+
+async function resolveSourceIdentity(input: SeedSourceInput, vault?: SeedVault): Promise<string> {
+  if (hasFromSeed(input)) {
+    return identityFromSeed(input.fromSeed);
+  }
+  if (!vault) throw new Error("Vault is not configured");
+  return vault.getIdentity(input.fromVault);
+}
+
+function hasFromSeed(input: SeedSourceInput): input is Readonly<{ fromSeed: string }> {
+  return "fromSeed" in input && typeof input.fromSeed === "string";
 }
 
 function toBigint(value: bigint | number): bigint {

@@ -116,6 +116,7 @@ const targetTick = await sdk.tick.getSuggestedTargetTick(); // currentTick + 15
 // const sdkWithVault = createSdk({ baseUrl: "https://rpc.qubic.org", vault });
 // const fromSeed = await sdkWithVault.vault?.getSeed("main");
 // await sdkWithVault.transfers.sendAndConfirm({ fromSeed, toIdentity, amount: 1n, targetTick });
+// await sdkWithVault.transfers.sendAndConfirm({ fromVault: "main", toIdentity, amount: 1n, targetTick });
 ```
 
 ## Docs
