@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { createRpcClient, RpcError } from "./client.js";
 import type { FetchLike } from "../http.js";
+import { createRpcClient, RpcError } from "./client.js";
 
 function createTestFetch(): FetchLike {
   return async (input, init) => {

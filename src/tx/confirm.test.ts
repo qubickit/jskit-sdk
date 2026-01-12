@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { createRpcClient } from "../rpc/client.js";
 import type { FetchLike } from "../http.js";
+import { createRpcClient } from "../rpc/client.js";
 import {
   createTxConfirmationHelpers,
   TxConfirmationTimeoutError,
