@@ -42,6 +42,12 @@ await sdk.transfers.sendAndConfirm({
   toIdentity: "DESTINATION_IDENTITY",
   amount: 1n,
 });
+
+await sdk.transfers.sendAndConfirmFromVault({
+  fromVault: "main",
+  toIdentity: "DESTINATION_IDENTITY",
+  amount: 1n,
+});
 ```
 
 ## Rotate the passphrase
@@ -66,6 +72,13 @@ qubic-vault list --path ./vault.json --passphrase "secret"
 qubic-vault rotate --path ./vault.json --passphrase "secret" --new-passphrase "next"
 qubic-vault export --path ./vault.json --passphrase "secret" --out vault-backup.json
 qubic-vault import --path ./vault.json --passphrase "secret" --file vault-backup.json --mode merge
+```
+
+## Other helpers
+
+```ts
+const signer = vault.signer("main"); // { fromVault: "main" }
+await sdk.transfers.sendAndConfirm({ ...signer, toIdentity: "DEST", amount: 1n });
 ```
 
 ## Notes

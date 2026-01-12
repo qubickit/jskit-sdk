@@ -111,6 +111,7 @@ export type SeedVault = Readonly<{
   list(): readonly VaultSummary[];
   getEntry(ref: string): VaultEntry;
   getIdentity(ref: string): string;
+  signer(ref: string): Readonly<{ fromVault: string }>;
   getSeed(ref: string): Promise<string>;
   addSeed(
     input: Readonly<{ name: string; seed: string; seedIndex?: number; overwrite?: boolean }>,
@@ -268,6 +269,11 @@ export async function openSeedVault(input: OpenSeedVaultInput): Promise<SeedVaul
     return findEntry(ref).identity;
   };
 
+  const signer = (ref: string): Readonly<{ fromVault: string }> => {
+    findEntry(ref);
+    return { fromVault: ref };
+  };
+
   const remove = async (ref: string): Promise<void> => {
     const entry = findEntry(ref);
     entries.delete(entry.name);
@@ -359,6 +365,7 @@ export async function openSeedVault(input: OpenSeedVaultInput): Promise<SeedVaul
     list,
     getEntry: findEntry,
     getIdentity,
+    signer,
     getSeed,
     addSeed,
     remove,

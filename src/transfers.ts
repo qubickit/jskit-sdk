@@ -43,6 +43,13 @@ export type TransferHelpers = Readonly<{
   send(input: BuildSignedTransferInput): Promise<SendTransferResult>;
   sendAndConfirm(input: SendAndConfirmInput): Promise<SendTransferResult>;
   sendAndConfirmWithReceipt(input: SendAndConfirmInput): Promise<SendTransferReceipt>;
+  sendFromVault(
+    input: Omit<BuildSignedTransferInput, "fromSeed" | "fromVault"> &
+      Readonly<{ fromVault: string }>,
+  ): Promise<SendTransferResult>;
+  sendAndConfirmFromVault(
+    input: Omit<SendAndConfirmInput, "fromSeed" | "fromVault"> & Readonly<{ fromVault: string }>,
+  ): Promise<SendTransferResult>;
 }>;
 
 export function createTransferHelpers(config: TransferHelpersConfig): TransferHelpers {
@@ -110,6 +117,14 @@ export function createTransferHelpers(config: TransferHelpersConfig): TransferHe
         broadcast: sent.broadcast,
         confirmedTransaction: sent.confirmedTransaction,
       };
+    },
+
+    async sendFromVault(input): Promise<SendTransferResult> {
+      return helpers.send({ ...input, fromVault: input.fromVault });
+    },
+
+    async sendAndConfirmFromVault(input): Promise<SendTransferResult> {
+      return helpers.sendAndConfirm({ ...input, fromVault: input.fromVault });
     },
   };
 

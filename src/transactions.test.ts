@@ -101,6 +101,9 @@ describe("transactions", () => {
         getIdentity() {
           return "IDENTITY";
         },
+        signer() {
+          return { fromVault: "main" };
+        },
         async getSeed() {
           return seed;
         },

@@ -82,4 +82,16 @@ describe("seed vault", () => {
     const seedReloaded = await vaultTwo.getSeed("main");
     expect(seedReloaded).toBe(SEED);
   });
+
+  it("supports signer helper", async () => {
+    currentDir = await mkdtemp(join(tmpdir(), "sdk-vault-"));
+    const vaultPath = join(currentDir, "vault.json");
+
+    const vault = await openSeedVault({ path: vaultPath, passphrase: "secret", create: true });
+    vaults.push(vault);
+    await vault.addSeed({ name: "main", seed: SEED });
+
+    const signer = vault.signer("main");
+    expect(signer.fromVault).toBe("main");
+  });
 });

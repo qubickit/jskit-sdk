@@ -24,3 +24,4 @@ Env vars:
 - `QUBIC_QBI_INPUT_HEX`: optional hex input bytes (default: 00)
 - `QUBIC_VAULT_PATH`: vault file path (default: ./vault.json)
 - `QUBIC_VAULT_PASSPHRASE`: vault passphrase (required for vault-basic)
+- `QUBIC_VAULT_EXPORT_PATH`: optional path for vault export (for vault-basic)

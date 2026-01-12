@@ -14,3 +14,9 @@ if (seed) {
 }
 
 console.log(vault.list());
+
+const exportPath = process.env.QUBIC_VAULT_EXPORT_PATH;
+if (exportPath) {
+  await Bun.write(exportPath, vault.exportJson());
+  console.log({ exported: exportPath });
+}
