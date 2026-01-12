@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import type { ContractsHelpers } from "./contracts.js";
+import type { QbiCodecRegistry } from "./qbi.js";
 import { createQbiHelpers, createQbiRegistry, defineQbiCodecs } from "./qbi.js";
 
 describe("qbi helpers", () => {
@@ -145,5 +146,48 @@ describe("qbi helpers", () => {
 
     const fee = await qbi.contract("QX").queryValue("GetFees", { inputValue: { flag: 1 } });
     expect(fee.fee).toBe(9);
+  });
+
+  it("throws codec validation errors for unknown entries", async () => {
+    const contracts: ContractsHelpers = {
+      async queryRaw() {
+        throw new Error("not used");
+      },
+      async querySmartContract() {
+        throw new Error("not used");
+      },
+    };
+
+    const registry = createQbiRegistry({
+      files: [
+        {
+          contract: { name: "QX", contractIndex: 1 },
+          entries: [{ kind: "function", name: "Fees", inputType: 1 }],
+        },
+      ],
+    });
+
+    const codecs = {
+      QX: {
+        functions: {
+          MissingEntry: {
+            encode(_entry: unknown, _value: unknown) {
+              return new Uint8Array();
+            },
+            decode(_entry: unknown, _bytes: Uint8Array) {
+              return 0;
+            },
+          },
+        },
+      },
+    } satisfies QbiCodecRegistry;
+
+    expect(() =>
+      createQbiHelpers({
+        contracts,
+        registry,
+        codecs,
+      }),
+    ).toThrow();
   });
 });

@@ -54,7 +54,16 @@ export type {
   QbiRegistry,
   QbiRegistryInput,
 } from "./src/qbi.js";
-export { createQbiHelpers, createQbiRegistry, defineQbiCodecs } from "./src/qbi.js";
+export {
+  createQbiHelpers,
+  createQbiRegistry,
+  defineQbiCodecs,
+  QbiCodecError,
+  QbiCodecMissingError,
+  QbiCodecValidationError,
+  QbiEntryNotFoundError,
+  QbiError,
+} from "./src/qbi.js";
 export type {
   BroadcastTransactionResult,
   ComputorList,

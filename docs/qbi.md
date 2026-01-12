@@ -91,6 +91,10 @@ If you want only the typed value:
 const fees = await sdk.qbi?.contract("QUtil").queryValue("GetFees", { inputValue: {} });
 ```
 
+## Codec validation and errors
+
+When `codecs` are provided, the SDK validates that every codec entry exists in the QBI file. Missing entries throw `QbiCodecValidationError`. Missing codecs when required throw `QbiCodecMissingError`. Encode/decode failures throw `QbiCodecError`.
+
 ## Registry tips
 
 - The SDK only uses the QBI files you pass in, so you control updates and breaking changes.

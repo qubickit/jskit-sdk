@@ -100,6 +100,35 @@ export type QbiQueryInput<Input = unknown, Output = unknown> = Readonly<{
 
 export type QbiQueryResult<Output = unknown> = QueryRawResult & Readonly<{ decoded?: Output }>;
 
+export class QbiError extends Error {
+  override name = "QbiError";
+}
+
+export class QbiCodecError extends QbiError {
+  override name = "QbiCodecError";
+}
+
+export class QbiCodecMissingError extends QbiCodecError {
+  constructor(message: string) {
+    super(message);
+    this.name = "QbiCodecMissingError";
+  }
+}
+
+export class QbiCodecValidationError extends QbiCodecError {
+  constructor(message: string) {
+    super(message);
+    this.name = "QbiCodecValidationError";
+  }
+}
+
+export class QbiEntryNotFoundError extends QbiError {
+  constructor(message: string) {
+    super(message);
+    this.name = "QbiEntryNotFoundError";
+  }
+}
+
 export type QbiHelpersConfig<TCodecs extends QbiCodecRegistry | undefined = undefined> = Readonly<{
   contracts: ContractsHelpers;
   registry: QbiRegistry;
@@ -192,6 +221,7 @@ export function createQbiHelpers<TCodecs extends QbiCodecRegistry | undefined = 
   config: QbiHelpersConfig<TCodecs>,
 ): QbiHelpers<TCodecs> {
   const { contracts, registry } = config;
+  validateCodecs(config.codecs, registry);
 
   const getContract = (nameOrIndex: string | number): QbiFile => {
     const file =
@@ -208,7 +238,9 @@ export function createQbiHelpers<TCodecs extends QbiCodecRegistry | undefined = 
     const contractCodecs = config.codecs?.[file.contract.name];
     const findEntry = (kind: QbiEntry["kind"], name: string): QbiEntry => {
       const entry = file.entries.find((e) => e.kind === kind && e.name === name);
-      if (!entry) throw new Error(`Unknown ${kind}: ${file.contract.name}.${name}`);
+      if (!entry) {
+        throw new QbiEntryNotFoundError(`Unknown ${kind}: ${file.contract.name}.${name}`);
+      }
       return entry;
     };
 
@@ -230,8 +262,18 @@ export function createQbiHelpers<TCodecs extends QbiCodecRegistry | undefined = 
     ): Uint8Array => {
       if (input.inputBytes) return input.inputBytes;
       if (input.inputValue !== undefined) {
-        if (!codec) throw new Error("QBI codec is required for inputValue");
-        return codec.encode(entry, input.inputValue);
+        if (!codec) {
+          throw new QbiCodecMissingError(
+            `QBI codec is required for inputValue (${file.contract.name}.${entry.name})`,
+          );
+        }
+        try {
+          return codec.encode(entry, input.inputValue);
+        } catch (error) {
+          throw new QbiCodecError(
+            `QBI codec encode failed (${file.contract.name}.${entry.name}): ${String(error)}`,
+          );
+        }
       }
       throw new Error("QBI inputBytes or inputValue is required");
     };
@@ -281,7 +323,7 @@ export function createQbiHelpers<TCodecs extends QbiCodecRegistry | undefined = 
         if (codec) {
           return {
             ...result,
-            decoded: codec.decode(entry, result.responseBytes),
+            decoded: safeDecode(codec, entry, result.responseBytes, file.contract.name),
           };
         }
         return result;
@@ -293,7 +335,7 @@ export function createQbiHelpers<TCodecs extends QbiCodecRegistry | undefined = 
         }
         const codec = resolveCodec("function", name, input.codec);
         if (!codec) {
-          throw new Error(`QBI codec missing for ${file.contract.name}.${name}`);
+          throw new QbiCodecMissingError(`QBI codec missing for ${file.contract.name}.${name}`);
         }
         const inputBytes = getInputBytes(entry, input, codec);
         if (
@@ -314,15 +356,15 @@ export function createQbiHelpers<TCodecs extends QbiCodecRegistry | undefined = 
           retryDelayMs: input.retryDelayMs,
           signal: input.signal,
         });
-        return codec.decode(entry, result.responseBytes);
+        return safeDecode(codec, entry, result.responseBytes, file.contract.name);
       },
       decodeOutput(name: string, outputBytes: Uint8Array, codec?: QbiCodec): unknown {
         const entry = findEntry("function", name);
         const resolved = resolveCodec("function", name, codec);
         if (!resolved) {
-          throw new Error(`QBI codec missing for ${file.contract.name}.${name}`);
+          throw new QbiCodecMissingError(`QBI codec missing for ${file.contract.name}.${name}`);
         }
-        return resolved.decode(entry, outputBytes);
+        return safeDecode(resolved, entry, outputBytes, file.contract.name);
       },
       prepareProcedure(name: string, inputBytes: Uint8Array) {
         const entry = findEntry("procedure", name);
@@ -462,6 +504,51 @@ function toSeedSource(input: SeedSourceInput): SeedSourceInput {
   return "fromSeed" in input && typeof input.fromSeed === "string"
     ? { fromSeed: input.fromSeed }
     : { fromVault: input.fromVault };
+}
+
+function safeDecode<Output>(
+  codec: QbiCodec<unknown, Output>,
+  entry: QbiEntry,
+  bytes: Uint8Array,
+  contractName: string,
+): Output {
+  try {
+    return codec.decode(entry, bytes);
+  } catch (error) {
+    throw new QbiCodecError(
+      `QBI codec decode failed (${contractName}.${entry.name}): ${String(error)}`,
+    );
+  }
+}
+
+function validateCodecs(codecs: QbiCodecRegistry | undefined, registry: QbiRegistry): void {
+  if (!codecs) return;
+
+  for (const [contractName, contractCodecs] of Object.entries(codecs)) {
+    const file = registry.byName.get(contractName);
+    if (!file) {
+      throw new QbiCodecValidationError(`QBI codecs reference unknown contract: ${contractName}`);
+    }
+    validateCodecEntries(file, contractCodecs.functions, "function", contractName);
+    validateCodecEntries(file, contractCodecs.procedures, "procedure", contractName);
+  }
+}
+
+function validateCodecEntries(
+  file: QbiFile,
+  codecs: Readonly<Record<string, QbiCodecLike>> | undefined,
+  kind: QbiEntry["kind"],
+  contractName: string,
+): void {
+  if (!codecs) return;
+  for (const entryName of Object.keys(codecs)) {
+    const entry = file.entries.find((e) => e.kind === kind && e.name === entryName);
+    if (!entry) {
+      throw new QbiCodecValidationError(
+        `QBI codecs reference unknown ${kind}: ${contractName}.${entryName}`,
+      );
+    }
+  }
 }
 
 function hexToBytes(hex: string): Uint8Array {
