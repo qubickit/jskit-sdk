@@ -167,6 +167,27 @@ describe("rpc client", () => {
     const rpc = createRpcClient({ baseUrl: "https://example.test", fetch: createTestFetch() });
     await expect(rpc.query.getTransactionsForTick(1)).rejects.toBeInstanceOf(RpcError);
   });
+
+  it("invokes onRequest/onResponse/onError hooks", async () => {
+    const requests: string[] = [];
+    const responses: number[] = [];
+    const errors: RpcError[] = [];
+    const rpc = createRpcClient({
+      baseUrl: "https://example.test",
+      fetch: createTestFetch(),
+      onRequest: (info) => requests.push(`${info.method} ${info.url}`),
+      onResponse: (info) => responses.push(info.status),
+      onError: (err) => errors.push(err),
+    });
+
+    await rpc.live.tickInfo();
+    await expect(rpc.query.getTransactionsForTick(1)).rejects.toBeInstanceOf(RpcError);
+
+    expect(requests.length).toBeGreaterThan(0);
+    expect(responses.length).toBeGreaterThan(0);
+    expect(errors.length).toBe(1);
+    expect(errors[0]?.code).toBe("rpc_request_failed");
+  });
 });
 
 function mustGet<T>(arr: readonly T[], index: number): T {

@@ -4,6 +4,8 @@ import { createBobClient } from "./client.js";
 describe("bob client", () => {
   it("querySmartContract sends hex payload and parses response", async () => {
     let body: Record<string, unknown> | undefined;
+    const requests: string[] = [];
+    const responses: number[] = [];
     const fetch: typeof globalThis.fetch = async (...args) => {
       const url = new URL(getUrl(args[0]));
       const method = getMethod(args[0], args[1]);
@@ -14,7 +16,12 @@ describe("bob client", () => {
       return new Response("not found", { status: 404 });
     };
 
-    const bob = createBobClient({ baseUrl: "http://example.test", fetch });
+    const bob = createBobClient({
+      baseUrl: "http://example.test",
+      fetch,
+      onRequest: (info) => requests.push(info.url),
+      onResponse: (info) => responses.push(info.status),
+    });
     const res = await bob.querySmartContract({
       scIndex: 1,
       funcNumber: 2,
@@ -24,6 +31,8 @@ describe("bob client", () => {
     expect(res.pending).toBe(false);
     expect(res.dataHex).toBe("abcd");
     expect(body?.data).toBe("abcd");
+    expect(requests.length).toBeGreaterThan(0);
+    expect(responses.length).toBeGreaterThan(0);
   });
 
   it("querySmartContract handles pending responses", async () => {

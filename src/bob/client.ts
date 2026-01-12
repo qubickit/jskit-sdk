@@ -1,14 +1,22 @@
+import { SdkError } from "../errors.js";
+
 export type BobClientConfig = Readonly<{
   /** Base URL for QubicBob (default: http://localhost:40420). */
   baseUrl?: string;
   fetch?: typeof fetch;
   headers?: Readonly<Record<string, string>>;
+  onRequest?: (info: Readonly<{ url: string; method: string; body?: unknown }>) => void;
+  onResponse?: (
+    info: Readonly<{ url: string; method: string; status: number; ok: boolean; durationMs: number }>,
+  ) => void;
+  onError?: (error: BobError) => void;
 }>;
 
-export class BobError extends Error {
+export class BobError extends SdkError {
   override name = "BobError";
 
   constructor(
+    code: string,
     message: string,
     readonly details: Readonly<{
       url: string;
@@ -17,8 +25,9 @@ export class BobError extends Error {
       statusText?: string;
       bodyText?: string;
     }>,
+    cause?: unknown,
   ) {
-    super(message);
+    super(code, message, details, cause);
   }
 }
 
@@ -96,6 +105,7 @@ export function createBobClient(config: BobClientConfig = {}): BobClient {
   const doFetch = config.fetch ?? fetch;
 
   const requestJson = async (method: string, url: URL, body?: unknown): Promise<unknown> => {
+    const start = Date.now();
     const headers: Record<string, string> = {
       accept: "application/json",
       ...config.headers,
@@ -106,34 +116,50 @@ export function createBobClient(config: BobClientConfig = {}): BobClient {
       bodyText = JSON.stringify(body);
     }
 
+    config.onRequest?.({ url: url.toString(), method, body });
     const res = await doFetch(url, {
       method,
       headers,
       body: bodyText,
     });
+    config.onResponse?.({
+      url: url.toString(),
+      method,
+      status: res.status,
+      ok: res.ok,
+      durationMs: Date.now() - start,
+    });
 
     const text = await res.text();
     if (!res.ok) {
-      throw new BobError(`QubicBob request failed: ${res.status} ${res.statusText}`, {
-        url: url.toString(),
-        method,
-        status: res.status,
-        statusText: res.statusText,
-        bodyText: text || undefined,
-      });
+      const error = new BobError(
+        "bob_request_failed",
+        `QubicBob request failed: ${res.status} ${res.statusText}`,
+        {
+          url: url.toString(),
+          method,
+          status: res.status,
+          statusText: res.statusText,
+          bodyText: text || undefined,
+        },
+      );
+      config.onError?.(error);
+      throw error;
     }
 
     if (text.length === 0) return null;
     try {
       return JSON.parse(text) as unknown;
     } catch {
-      throw new BobError("QubicBob response was not valid JSON", {
+      const error = new BobError("bob_invalid_json", "QubicBob response was not valid JSON", {
         url: url.toString(),
         method,
         status: res.status,
         statusText: res.statusText,
         bodyText: text || undefined,
       });
+      config.onError?.(error);
+      throw error;
     }
   };
 
@@ -205,20 +231,31 @@ export function createBobClient(config: BobClientConfig = {}): BobClient {
         data: dataHex,
       });
 
+      const start = Date.now();
+      config.onRequest?.({ url: url.toString(), method: "POST", body: JSON.parse(bodyText) });
       const res = await doFetch(url, { method: "POST", headers, body: bodyText });
+      config.onResponse?.({
+        url: url.toString(),
+        method: "POST",
+        status: res.status,
+        ok: res.ok,
+        durationMs: Date.now() - start,
+      });
       const text = await res.text();
       let json: unknown = null;
       if (text.length) {
         try {
           json = JSON.parse(text) as unknown;
         } catch {
-          throw new BobError("QubicBob response was not valid JSON", {
+          const error = new BobError("bob_invalid_json", "QubicBob response was not valid JSON", {
             url: url.toString(),
             method: "POST",
             status: res.status,
             statusText: res.statusText,
             bodyText: text || undefined,
           });
+          config.onError?.(error);
+          throw error;
         }
       }
 
@@ -232,13 +269,19 @@ export function createBobClient(config: BobClientConfig = {}): BobClient {
       }
 
       if (!res.ok) {
-        throw new BobError(`QubicBob request failed: ${res.status} ${res.statusText}`, {
-          url: url.toString(),
-          method: "POST",
-          status: res.status,
-          statusText: res.statusText,
-          bodyText: text || undefined,
-        });
+        const error = new BobError(
+          "bob_request_failed",
+          `QubicBob request failed: ${res.status} ${res.statusText}`,
+          {
+            url: url.toString(),
+            method: "POST",
+            status: res.status,
+            statusText: res.statusText,
+            bodyText: text || undefined,
+          },
+        );
+        config.onError?.(error);
+        throw error;
       }
 
       const obj = expectObject(json);
@@ -296,4 +339,3 @@ function randomUint32(): number {
   }
   return Math.floor(Math.random() * 0xffff_ffff);
 }
-

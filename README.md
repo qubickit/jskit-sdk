@@ -26,7 +26,7 @@ bun add @qubic-labs/core@file:../jskit-core
 
 ## Status
 
-RPC + tx workflows are available. Next: higher-level contract helpers and indexer clients.
+RPC + tx workflows are available. Indexer + assets helpers are now available; next: richer typing + QBI integration.
 
 ## Public API
 

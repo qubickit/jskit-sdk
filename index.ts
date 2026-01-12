@@ -15,6 +15,8 @@ export type {
 export { createRpcClient, RpcError } from "./src/rpc/client.js";
 export type { SdkConfig } from "./src/sdk.js";
 export { createSdk } from "./src/sdk.js";
+export type { ErrorContext } from "./src/errors.js";
+export { SdkError } from "./src/errors.js";
 export type {
   BobClient,
   BobClientConfig,
