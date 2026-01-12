@@ -21,6 +21,7 @@
     "examples:send-many": "bun run examples/send-many.ts",
     "examples:log-stream": "bun run examples/log-stream.ts",
     "examples:qbi-query": "bun run examples/qbi-query.ts",
+    "examples:vault-basic": "bun run examples/vault-basic.ts",
     "release": "bunx semantic-release",
     "prepack": "bun run build"
   },

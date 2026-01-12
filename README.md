@@ -115,6 +115,7 @@ const targetTick = await sdk.tick.getSuggestedTargetTick(); // currentTick + 15
 ## Docs
 
 - QBI guide: `jskit-sdk/docs/qbi.md`
+- Seed vault: `jskit-sdk/docs/vault.md`
 - Releasing: `jskit-sdk/docs/releasing.md`
 
 ## Examples
