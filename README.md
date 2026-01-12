@@ -104,6 +104,11 @@ const targetTick = await sdk.tick.getSuggestedTargetTick(); // currentTick + 15
 
 // Assets query (RequestAssets)
 // const assets = await sdk.assets?.listIssued({ issuerIdentity: "..." });
+
+// QBI integration (optional)
+// import qx from "../qbi/registry/Qx.qbi" assert { type: "json" };
+// const sdkWithQbi = createSdk({ baseUrl: "https://rpc.qubic.org", qbi: { files: [qx] } });
+// const fees = await sdkWithQbi.qbi?.contract("QX").query("Fees", { inputBytes: new Uint8Array() });
 ```
 
 ## Examples

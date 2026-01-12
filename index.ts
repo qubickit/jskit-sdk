@@ -41,6 +41,16 @@ export { ContractQueryAbortedError, createContractHelpers } from "./src/contract
 export type { ErrorContext } from "./src/errors.js";
 export { SdkError } from "./src/errors.js";
 export type {
+  QbiEntry,
+  QbiFile,
+  QbiHelpers,
+  QbiHelpersConfig,
+  QbiQueryInput,
+  QbiRegistry,
+  QbiRegistryInput,
+} from "./src/qbi.js";
+export { createQbiHelpers, createQbiRegistry } from "./src/qbi.js";
+export type {
   BroadcastTransactionResult,
   ComputorList,
   LastProcessedTick,

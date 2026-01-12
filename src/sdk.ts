@@ -2,6 +2,7 @@ import { createAssetsHelpers } from "./assets.js";
 import { createBobClient } from "./bob/client.js";
 import { createContractHelpers } from "./contracts.js";
 import type { FetchLike } from "./http.js";
+import { createQbiHelpers, createQbiRegistry } from "./qbi.js";
 import { createRpcClient } from "./rpc/client.js";
 import { createTickHelpers } from "./tick.js";
 import { createTransactionHelpers } from "./transactions.js";
@@ -35,6 +36,21 @@ export type SdkConfig = Readonly<{
   }>;
   assets?: Readonly<{
     requestAssets?: (request: Uint8Array, signal?: AbortSignal) => Promise<readonly Uint8Array[]>;
+  }>;
+  qbi?: Readonly<{
+    files?: readonly Readonly<{
+      contract: Readonly<{
+        name: string;
+        contractIndex?: number;
+      }>;
+      entries: readonly Readonly<{
+        kind: "function" | "procedure";
+        name: string;
+        inputType: number;
+        inputSize?: number;
+        outputSize?: number;
+      }>[];
+    }>[];
   }>;
   bob?: Readonly<{
     baseUrl?: string;
@@ -78,10 +94,13 @@ export function createSdk(config: SdkConfig = {}) {
   const assets = config.assets?.requestAssets
     ? createAssetsHelpers({ requestAssets: config.assets.requestAssets })
     : undefined;
+  const qbi = config.qbi?.files
+    ? createQbiHelpers({ contracts, registry: createQbiRegistry({ files: config.qbi.files }) })
+    : undefined;
   const bob = createBobClient({
     baseUrl: config.bob?.baseUrl,
     fetch: config.bob?.fetch ?? config.fetch,
     headers: config.bob?.headers,
   });
-  return { rpc, tick, tx, txQueue, transactions, transfers, contracts, assets, bob } as const;
+  return { rpc, tick, tx, txQueue, transactions, transfers, contracts, assets, qbi, bob } as const;
 }
