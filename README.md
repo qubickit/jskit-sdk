@@ -26,7 +26,7 @@ bun add @qubic-labs/core@file:../jskit-core
 
 ## Status
 
-RPC + tx workflows are available. Indexer + assets helpers are now available; next: richer typing + QBI integration.
+RPC + tx workflows are available. Indexer + assets helpers and QBI integration are available; next: richer typing + more codecs.
 
 ## Public API
 
@@ -105,16 +105,17 @@ const targetTick = await sdk.tick.getSuggestedTargetTick(); // currentTick + 15
 // Assets query (RequestAssets)
 // const assets = await sdk.assets?.listIssued({ issuerIdentity: "..." });
 
-// QBI integration (optional)
-// import qx from "../qbi/registry/Qx.qbi" assert { type: "json" };
-// const sdkWithQbi = createSdk({ baseUrl: "https://rpc.qubic.org", qbi: { files: [qx] } });
-// const fees = await sdkWithQbi.qbi?.contract("QX").query("Fees", { inputBytes: new Uint8Array() });
+// QBI integration (optional, user-provided registry files)
+// import qutil from "./qbi/QUtil.qbi" assert { type: "json" };
+// const sdkWithQbi = createSdk({ baseUrl: "https://rpc.qubic.org", qbi: { files: [qutil] } });
+// const fees = await sdkWithQbi.qbi?.contract("QUtil").query("GetFees", { inputBytes: new Uint8Array([0]) });
 ```
+
+## Docs
+
+- QBI guide: `jskit-sdk/docs/qbi.md`
+- Releasing: `jskit-sdk/docs/releasing.md`
 
 ## Examples
 
 See `jskit-sdk/examples/README.md`.
-
-## Releasing
-
-See `jskit-sdk/docs/releasing.md`.

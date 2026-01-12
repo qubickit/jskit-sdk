@@ -5,12 +5,12 @@ This package is designed to be released with an automated pipeline (semantic ver
 ## Current status
 
 - CI is set up in `jskit-sdk/.github/workflows/ci.yml`.
-- Release automation is intentionally not wired yet in this repo snapshot (it requires adding release tooling dependencies and updating `bun.lock`).
+- Release automation is wired in `jskit-sdk/.github/workflows/release.yml` and uses semantic-release.
+  - The workflow skips when `NPM_TOKEN` is missing.
+  - Releases publish to npm and create GitHub releases on `main`.
 
-## Recommended approach
+## Usage
 
-- Use the same approach as `jskit-core`:
-  - semantic-release
-  - publish only when `NPM_TOKEN` is available
-  - generate changelog and GitHub releases
-
+- Ensure `NPM_TOKEN` is configured in GitHub Actions secrets.
+- Push to `main` or run the workflow manually.
+- The release job runs `bun run check`, `bun test`, `bun run build`, then `bun run release`.
