@@ -10,18 +10,18 @@ function createTestFetch() {
   let lastProcessed = 0;
   let getTxCalls = 0;
 
-  return async (input: RequestInfo | URL, init?: RequestInit) => {
-    const req = new Request(input, init);
-    const url = new URL(req.url);
+  return async (...args: Parameters<typeof fetch>) => {
+    const url = new URL(getUrl(args[0]));
+    const method = getMethod(args[0], args[1]);
 
-    if (req.method === "GET" && url.pathname === "/query/v1/getLastProcessedTick") {
+    if (method === "GET" && url.pathname === "/query/v1/getLastProcessedTick") {
       lastProcessed = Math.min(lastProcessed + 5, 10);
       return Response.json({ tickNumber: lastProcessed, epoch: 0, intervalInitialTick: 0 });
     }
 
-    if (req.method === "POST" && url.pathname === "/query/v1/getTransactionByHash") {
+    if (method === "POST" && url.pathname === "/query/v1/getTransactionByHash") {
       getTxCalls++;
-      const body = (await req.json()) as Record<string, unknown>;
+      const body = readJsonBody(args[0], args[1]);
       if (body.hash !== "tx") return new Response("bad hash", { status: 400 });
 
       if (getTxCalls < 2) return new Response("not found", { status: 404 });
@@ -71,13 +71,13 @@ describe("tx confirmation", () => {
   });
 
   it("throws TxNotFoundError if target tick is reached but tx stays 404", async () => {
-    const fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
-      const req = new Request(input, init);
-      const url = new URL(req.url);
-      if (req.method === "GET" && url.pathname === "/query/v1/getLastProcessedTick") {
+    const fetch: typeof globalThis.fetch = async (...args) => {
+      const url = new URL(getUrl(args[0]));
+      const method = getMethod(args[0], args[1]);
+      if (method === "GET" && url.pathname === "/query/v1/getLastProcessedTick") {
         return Response.json({ tickNumber: 10, epoch: 0, intervalInitialTick: 0 });
       }
-      if (req.method === "POST" && url.pathname === "/query/v1/getTransactionByHash") {
+      if (method === "POST" && url.pathname === "/query/v1/getTransactionByHash") {
         return new Response("not found", { status: 404 });
       }
       return new Response("not found", { status: 404 });
@@ -95,13 +95,13 @@ describe("tx confirmation", () => {
   });
 
   it("throws TxConfirmationTimeoutError if lastProcessedTick never reaches target", async () => {
-    const fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
-      const req = new Request(input, init);
-      const url = new URL(req.url);
-      if (req.method === "GET" && url.pathname === "/query/v1/getLastProcessedTick") {
+    const fetch: typeof globalThis.fetch = async (...args) => {
+      const url = new URL(getUrl(args[0]));
+      const method = getMethod(args[0], args[1]);
+      if (method === "GET" && url.pathname === "/query/v1/getLastProcessedTick") {
         return Response.json({ tickNumber: 0, epoch: 0, intervalInitialTick: 0 });
       }
-      if (req.method === "POST" && url.pathname === "/query/v1/getTransactionByHash") {
+      if (method === "POST" && url.pathname === "/query/v1/getTransactionByHash") {
         return new Response("not found", { status: 404 });
       }
       return new Response("not found", { status: 404 });
@@ -118,3 +118,31 @@ describe("tx confirmation", () => {
     ).rejects.toBeInstanceOf(TxConfirmationTimeoutError);
   });
 });
+
+function getUrl(input: Parameters<typeof fetch>[0]): string {
+  if (typeof input === "string") return input;
+  if (input instanceof URL) return input.toString();
+  return input.url;
+}
+
+function getMethod(input: Parameters<typeof fetch>[0], init: Parameters<typeof fetch>[1]): string {
+  if (init?.method) return init.method;
+  if (input instanceof Request) return input.method;
+  return "GET";
+}
+
+function readJsonBody(
+  input: Parameters<typeof fetch>[0],
+  init: Parameters<typeof fetch>[1],
+): Record<string, unknown> {
+  if (input instanceof Request) {
+    // Our client doesn't use this path in tests, but keep it safe.
+    throw new Error("Unexpected Request body");
+  }
+  const body = init?.body;
+  if (typeof body === "string") {
+    return JSON.parse(body) as Record<string, unknown>;
+  }
+  if (!body) return {};
+  throw new Error("Unsupported body type");
+}

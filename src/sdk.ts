@@ -1,4 +1,5 @@
 import { createRpcClient } from "./rpc/client.js";
+import { createContractHelpers } from "./contracts.js";
 import { createTickHelpers } from "./tick.js";
 import { createTransactionHelpers } from "./transactions.js";
 import { createTransferHelpers } from "./transfers.js";
@@ -25,6 +26,10 @@ export type SdkConfig = Readonly<{
     enabled?: boolean;
     policy?: TxQueuePolicy;
   }>;
+  contracts?: Readonly<{
+    defaultRetries?: number;
+    defaultRetryDelayMs?: number;
+  }>;
 }>;
 
 export function createSdk(config: SdkConfig = {}) {
@@ -42,6 +47,11 @@ export function createSdk(config: SdkConfig = {}) {
     defaultPollIntervalMs: config.tx?.confirmPollIntervalMs,
   });
   const tx = createTxHelpers({ rpc, confirm });
+  const contracts = createContractHelpers({
+    rpc,
+    defaultRetries: config.contracts?.defaultRetries,
+    defaultRetryDelayMs: config.contracts?.defaultRetryDelayMs,
+  });
 
   const txQueue =
     config.txQueue?.enabled === false
@@ -54,5 +64,5 @@ export function createSdk(config: SdkConfig = {}) {
 
   const transactions = createTransactionHelpers({ tick, tx, txQueue });
   const transfers = createTransferHelpers({ transactions });
-  return { rpc, tick, tx, txQueue, transactions, transfers } as const;
+  return { rpc, tick, tx, txQueue, transactions, transfers, contracts } as const;
 }

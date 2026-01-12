@@ -25,7 +25,7 @@ bun add @qubic-labs/core@file:../jskit-core
 
 ## Status
 
-RPC client is available. Next: tx workflows (tick selection, TxQueue, broadcast+confirm helpers).
+RPC + tx workflows are available. Next: higher-level contract helpers and indexer clients.
 
 ## Public API
 
@@ -79,6 +79,14 @@ const targetTick = await sdk.tick.getSuggestedTargetTick(); // currentTick + 15
 //   toIdentity,
 //   amount: 1n,
 //   targetTick,
+// });
+
+// raw contract query (RPC live)
+// const res = await sdk.contracts.queryRaw({
+//   contractIndex: 1,
+//   inputType: 1,
+//   inputBytes: new Uint8Array(),
+//   expectedOutputSize: 32,
 // });
 ```
 

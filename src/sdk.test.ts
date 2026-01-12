@@ -3,11 +3,13 @@ import { createSdk } from "./sdk.js";
 
 describe("sdk scaffold", () => {
   it("creates a sdk object", () => {
-    expect(createSdk()).toHaveProperty("rpc");
-    expect(createSdk()).toHaveProperty("tx");
-    expect(createSdk()).toHaveProperty("txQueue");
-    expect(createSdk()).toHaveProperty("tick");
-    expect(createSdk()).toHaveProperty("transactions");
-    expect(createSdk()).toHaveProperty("transfers");
+    const sdk = createSdk();
+    expect(sdk).toHaveProperty("rpc");
+    expect(sdk).toHaveProperty("tx");
+    expect(sdk).toHaveProperty("txQueue");
+    expect(sdk).toHaveProperty("tick");
+    expect(sdk).toHaveProperty("transactions");
+    expect(sdk).toHaveProperty("transfers");
+    expect(sdk).toHaveProperty("contracts");
   });
 });

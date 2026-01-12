@@ -15,6 +15,13 @@ export type {
 export { createRpcClient, RpcError } from "./src/rpc/client.js";
 export type { SdkConfig } from "./src/sdk.js";
 export { createSdk } from "./src/sdk.js";
+export type {
+  ContractsHelpers,
+  ContractsHelpersConfig,
+  QueryRawInput,
+  QueryRawResult,
+} from "./src/contracts.js";
+export { ContractQueryAbortedError, createContractHelpers } from "./src/contracts.js";
 export type { SuggestedTargetTickInput, TickHelpers, TickHelpersConfig } from "./src/tick.js";
 export { createTickHelpers } from "./src/tick.js";
 export type {
