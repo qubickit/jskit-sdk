@@ -1,3 +1,12 @@
+## [1.2.0](https://github.com/qubickit/jskit-sdk/compare/v1.1.0...v1.2.0) (2026-01-12)
+
+### Features
+
+* **vault:** add cli and fromVault wiring ([a60796e](https://github.com/qubickit/jskit-sdk/commit/a60796e49acade1316688449953d55d712152c7a))
+* **vault:** add file-based seed vault ([1c3e0ea](https://github.com/qubickit/jskit-sdk/commit/1c3e0ea7fc01d35247bf2f0479fd529d761aa08c))
+* **vault:** add signer and helpers ([b594fe1](https://github.com/qubickit/jskit-sdk/commit/b594fe12f01bc01f2ec85171edea4aa93fbfc262))
+* **vault:** wire vault into sdk ([150cc53](https://github.com/qubickit/jskit-sdk/commit/150cc53e01e630126635f52ff9486432551656ef))
+
 ## [1.1.0](https://github.com/qubickit/jskit-sdk/compare/v1.0.0...v1.1.0) (2026-01-12)
 
 ### Features
