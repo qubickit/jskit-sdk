@@ -1,3 +1,9 @@
+## [1.1.0](https://github.com/qubickit/jskit-sdk/compare/v1.0.0...v1.1.0) (2026-01-12)
+
+### Features
+
+* **qbi:** add typed codecs and auto decode ([b38d612](https://github.com/qubickit/jskit-sdk/commit/b38d612ea86ea79ef1643a9e9d4fa705898faa80))
+
 ## 1.0.0 (2026-01-12)
 
 ### Features
