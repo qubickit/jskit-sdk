@@ -77,6 +77,7 @@ export { createTickHelpers } from "./src/tick.js";
 export type {
   BuildSignedTransactionInput,
   BuiltTransaction,
+  SeedSourceInput,
   SendAndConfirmTransactionInput,
   SendTransactionReceipt,
   SendTransactionResult,
@@ -116,3 +117,19 @@ export type {
   TxQueuePolicy,
 } from "./src/tx/tx-queue.js";
 export { TxQueue, TxQueueError } from "./src/tx/tx-queue.js";
+export type {
+  OpenSeedVaultInput,
+  SeedVault,
+  VaultEntry,
+  VaultExport,
+  VaultSummary,
+} from "./src/vault.js";
+export {
+  openSeedVault,
+  VaultEntryExistsError,
+  VaultEntryNotFoundError,
+  VaultError,
+  VaultInvalidPassphraseError,
+  VaultNotFoundError,
+  vaultExists,
+} from "./src/vault.js";

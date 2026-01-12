@@ -11,6 +11,7 @@ import { createTxConfirmationHelpers } from "./tx/confirm.js";
 import { createTxHelpers } from "./tx/tx.js";
 import type { TxQueuePolicy } from "./tx/tx-queue.js";
 import { TxQueue } from "./tx/tx-queue.js";
+import type { SeedVault } from "./vault.js";
 
 export type SdkConfig = Readonly<{
   /** Partner RPC base URL (recommended: `https://rpc.qubic.org`). */
@@ -41,6 +42,7 @@ export type SdkConfig = Readonly<{
     files?: readonly QbiFile[];
     codecs?: QbiCodecRegistry;
   }>;
+  vault?: SeedVault;
   bob?: Readonly<{
     baseUrl?: string;
     fetch?: FetchLike;
@@ -78,7 +80,7 @@ export function createSdk(config: SdkConfig = {}) {
             tx.waitForConfirmation({ txId, targetTick, signal }),
         });
 
-  const transactions = createTransactionHelpers({ tick, tx, txQueue });
+  const transactions = createTransactionHelpers({ tick, tx, txQueue, vault: config.vault });
   const transfers = createTransferHelpers({ transactions });
   const assets = config.assets?.requestAssets
     ? createAssetsHelpers({ requestAssets: config.assets.requestAssets })
@@ -102,5 +104,18 @@ export function createSdk(config: SdkConfig = {}) {
     fetch: config.bob?.fetch ?? config.fetch,
     headers: config.bob?.headers,
   });
-  return { rpc, tick, tx, txQueue, transactions, transfers, contracts, assets, qbi, bob } as const;
+  const vault = config.vault;
+  return {
+    rpc,
+    tick,
+    tx,
+    txQueue,
+    transactions,
+    transfers,
+    contracts,
+    assets,
+    qbi,
+    vault,
+    bob,
+  } as const;
 }

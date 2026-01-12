@@ -1,16 +1,16 @@
 import type { BroadcastTransactionResult, QueryTransaction } from "./rpc/client.js";
-import type { TransactionHelpers } from "./transactions.js";
+import type { SeedSourceInput, TransactionHelpers } from "./transactions.js";
 
 export type TransferHelpersConfig = Readonly<{
   transactions: TransactionHelpers;
 }>;
 
-export type BuildSignedTransferInput = Readonly<{
-  fromSeed: string;
-  toIdentity: string;
-  amount: bigint;
-  targetTick?: bigint | number;
-}>;
+export type BuildSignedTransferInput = SeedSourceInput &
+  Readonly<{
+    toIdentity: string;
+    amount: bigint;
+    targetTick?: bigint | number;
+  }>;
 
 export type SignedTransfer = Readonly<{
   txBytes: Uint8Array;
@@ -43,13 +43,20 @@ export type TransferHelpers = Readonly<{
   send(input: BuildSignedTransferInput): Promise<SendTransferResult>;
   sendAndConfirm(input: SendAndConfirmInput): Promise<SendTransferResult>;
   sendAndConfirmWithReceipt(input: SendAndConfirmInput): Promise<SendTransferReceipt>;
+  sendFromVault(
+    input: Omit<BuildSignedTransferInput, "fromSeed" | "fromVault"> &
+      Readonly<{ fromVault: string }>,
+  ): Promise<SendTransferResult>;
+  sendAndConfirmFromVault(
+    input: Omit<SendAndConfirmInput, "fromSeed" | "fromVault"> & Readonly<{ fromVault: string }>,
+  ): Promise<SendTransferResult>;
 }>;
 
 export function createTransferHelpers(config: TransferHelpersConfig): TransferHelpers {
   const helpers: TransferHelpers = {
     async buildSignedTransfer(input: BuildSignedTransferInput): Promise<SignedTransfer> {
       const built = await config.transactions.buildSigned({
-        fromSeed: input.fromSeed,
+        ...input,
         toIdentity: input.toIdentity,
         amount: input.amount,
         targetTick: input.targetTick,
@@ -59,7 +66,7 @@ export function createTransferHelpers(config: TransferHelpersConfig): TransferHe
 
     async send(input: BuildSignedTransferInput): Promise<SendTransferResult> {
       const sent = await config.transactions.send({
-        fromSeed: input.fromSeed,
+        ...input,
         toIdentity: input.toIdentity,
         amount: input.amount,
         targetTick: input.targetTick,
@@ -75,7 +82,7 @@ export function createTransferHelpers(config: TransferHelpersConfig): TransferHe
 
     async sendAndConfirm(input: SendAndConfirmInput): Promise<SendTransferResult> {
       const sent = await config.transactions.sendAndConfirm({
-        fromSeed: input.fromSeed,
+        ...input,
         toIdentity: input.toIdentity,
         amount: input.amount,
         targetTick: input.targetTick,
@@ -94,7 +101,7 @@ export function createTransferHelpers(config: TransferHelpersConfig): TransferHe
 
     async sendAndConfirmWithReceipt(input: SendAndConfirmInput): Promise<SendTransferReceipt> {
       const sent = await config.transactions.sendAndConfirmWithReceipt({
-        fromSeed: input.fromSeed,
+        ...input,
         toIdentity: input.toIdentity,
         amount: input.amount,
         targetTick: input.targetTick,
@@ -110,6 +117,14 @@ export function createTransferHelpers(config: TransferHelpersConfig): TransferHe
         broadcast: sent.broadcast,
         confirmedTransaction: sent.confirmedTransaction,
       };
+    },
+
+    async sendFromVault(input): Promise<SendTransferResult> {
+      return helpers.send({ ...input, fromVault: input.fromVault });
+    },
+
+    async sendAndConfirmFromVault(input): Promise<SendTransferResult> {
+      return helpers.sendAndConfirm({ ...input, fromVault: input.fromVault });
     },
   };
 
