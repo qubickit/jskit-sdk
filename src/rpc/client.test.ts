@@ -1,18 +1,19 @@
 import { describe, expect, it } from "bun:test";
 import { createRpcClient, RpcError } from "./client.js";
+import type { FetchLike } from "../http.js";
 
-function createTestFetch(): typeof fetch {
+function createTestFetch(): FetchLike {
   return async (input, init) => {
-    const req = new Request(input, init);
-    const url = new URL(req.url);
+    const url = new URL(getUrl(input));
+    const method = getMethod(input, init);
 
-    if (req.method === "GET" && url.pathname === "/live/v1/tick-info") {
+    if (method === "GET" && url.pathname === "/live/v1/tick-info") {
       return Response.json({
         tickInfo: { tick: 123, duration: 1500, epoch: 12, initialTick: 100 },
       });
     }
 
-    if (req.method === "GET" && url.pathname.startsWith("/live/v1/balances/")) {
+    if (method === "GET" && url.pathname.startsWith("/live/v1/balances/")) {
       const id = decodeURIComponent(url.pathname.split("/").pop() ?? "");
       return Response.json({
         balance: {
@@ -29,8 +30,8 @@ function createTestFetch(): typeof fetch {
       });
     }
 
-    if (req.method === "POST" && url.pathname === "/live/v1/broadcast-transaction") {
-      const body = (await req.json()) as Record<string, unknown>;
+    if (method === "POST" && url.pathname === "/live/v1/broadcast-transaction") {
+      const body = readJsonBody(input, init);
       if (body.encodedTransaction !== "AQID") {
         return new Response(JSON.stringify({ error: "bad tx base64" }), { status: 400 });
       }
@@ -41,8 +42,8 @@ function createTestFetch(): typeof fetch {
       });
     }
 
-    if (req.method === "POST" && url.pathname === "/live/v1/querySmartContract") {
-      const body = (await req.json()) as Record<string, unknown>;
+    if (method === "POST" && url.pathname === "/live/v1/querySmartContract") {
+      const body = readJsonBody(input, init);
       if (body.inputSize !== 2) {
         return new Response(JSON.stringify({ error: "bad inputSize" }), { status: 400 });
       }
@@ -52,11 +53,11 @@ function createTestFetch(): typeof fetch {
       return Response.json({ responseData: "AA==" });
     }
 
-    if (req.method === "GET" && url.pathname === "/query/v1/getLastProcessedTick") {
+    if (method === "GET" && url.pathname === "/query/v1/getLastProcessedTick") {
       return Response.json({ tickNumber: 10, epoch: 1, intervalInitialTick: 0 });
     }
 
-    if (req.method === "GET" && url.pathname === "/query/v1/getProcessedTickIntervals") {
+    if (method === "GET" && url.pathname === "/query/v1/getProcessedTickIntervals") {
       return Response.json({
         processedTickIntervals: [
           { epoch: 1, firstTick: 0, lastTick: 10 },
@@ -65,8 +66,8 @@ function createTestFetch(): typeof fetch {
       });
     }
 
-    if (req.method === "POST" && url.pathname === "/query/v1/getComputorListsForEpoch") {
-      const body = (await req.json()) as Record<string, unknown>;
+    if (method === "POST" && url.pathname === "/query/v1/getComputorListsForEpoch") {
+      const body = readJsonBody(input, init);
       if (body.epoch !== 1) {
         return new Response(JSON.stringify({ error: "bad epoch" }), { status: 400 });
       }
@@ -82,8 +83,8 @@ function createTestFetch(): typeof fetch {
       });
     }
 
-    if (req.method === "POST" && url.pathname === "/query/v1/getTransactionByHash") {
-      const body = (await req.json()) as Record<string, unknown>;
+    if (method === "POST" && url.pathname === "/query/v1/getTransactionByHash") {
+      const body = readJsonBody(input, init);
       if (body.hash !== "deadbeef") {
         return new Response(JSON.stringify({ error: "bad hash" }), { status: 400 });
       }
@@ -194,4 +195,31 @@ function mustGet<T>(arr: readonly T[], index: number): T {
   const value = arr[index];
   if (value === undefined) throw new Error(`Missing index: ${index}`);
   return value;
+}
+
+function getUrl(input: Parameters<FetchLike>[0]): string {
+  if (typeof input === "string") return input;
+  if (input instanceof URL) return input.toString();
+  return input.url;
+}
+
+function getMethod(input: Parameters<FetchLike>[0], init: Parameters<FetchLike>[1]): string {
+  if (init?.method) return init.method;
+  if (input instanceof Request) return input.method;
+  return "GET";
+}
+
+function readJsonBody(
+  input: Parameters<FetchLike>[0],
+  init: Parameters<FetchLike>[1],
+): Record<string, unknown> {
+  if (input instanceof Request) {
+    throw new Error("Unexpected Request body");
+  }
+  const body = init?.body;
+  if (typeof body === "string") {
+    return JSON.parse(body) as Record<string, unknown>;
+  }
+  if (!body) return {};
+  throw new Error("Unsupported body type");
 }

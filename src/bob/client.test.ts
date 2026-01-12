@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import type { FetchLike } from "../http.js";
 import { createBobClient } from "./client.js";
 
 describe("bob client", () => {
@@ -6,7 +7,7 @@ describe("bob client", () => {
     let body: Record<string, unknown> | undefined;
     const requests: string[] = [];
     const responses: number[] = [];
-    const fetch: typeof globalThis.fetch = async (...args) => {
+    const fetch: FetchLike = async (...args) => {
       const url = new URL(getUrl(args[0]));
       const method = getMethod(args[0], args[1]);
       if (method === "POST" && url.pathname === "/querySmartContract") {
@@ -36,7 +37,7 @@ describe("bob client", () => {
   });
 
   it("querySmartContract handles pending responses", async () => {
-    const fetch: typeof globalThis.fetch = async (...args) => {
+    const fetch: FetchLike = async (...args) => {
       const url = new URL(getUrl(args[0]));
       const method = getMethod(args[0], args[1]);
       if (method === "POST" && url.pathname === "/querySmartContract") {

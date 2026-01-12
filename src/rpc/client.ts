@@ -1,4 +1,5 @@
 import { SdkError } from "../errors.js";
+import type { FetchLike } from "../http.js";
 
 export type RpcClientConfig = Readonly<{
   /**
@@ -7,7 +8,7 @@ export type RpcClientConfig = Readonly<{
    * those suffixes are stripped automatically.
    */
   baseUrl?: string;
-  fetch?: typeof fetch;
+  fetch?: FetchLike;
   headers?: Readonly<Record<string, string>>;
   onRequest?: (info: Readonly<{ url: string; method: string; body?: unknown }>) => void;
   onResponse?: (
@@ -449,7 +450,7 @@ function decodeBase64(base64: string): Uint8Array {
 
 function expectObject(value: unknown, label = "value"): Record<string, unknown> {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
-    throw new RpcError(`Invalid RPC payload: ${label} is not an object`, {
+    throw new RpcError("rpc_invalid_payload", `Invalid RPC payload: ${label} is not an object`, {
       url: "",
       method: "",
     });
@@ -459,24 +460,36 @@ function expectObject(value: unknown, label = "value"): Record<string, unknown> 
 
 function expectArray(value: unknown, label: string): unknown[] {
   if (!Array.isArray(value)) {
-    throw new RpcError(`Invalid RPC payload: ${label} is not an array`, { url: "", method: "" });
+    throw new RpcError("rpc_invalid_payload", `Invalid RPC payload: ${label} is not an array`, {
+      url: "",
+      method: "",
+    });
   }
   return value;
 }
 
 function expectString(value: unknown, label: string): string {
   if (typeof value !== "string") {
-    throw new RpcError(`Invalid RPC payload: ${label} is not a string`, { url: "", method: "" });
+    throw new RpcError("rpc_invalid_payload", `Invalid RPC payload: ${label} is not a string`, {
+      url: "",
+      method: "",
+    });
   }
   return value;
 }
 
 function expectInt32(value: unknown, label: string): number {
   if (typeof value !== "number" || !Number.isInteger(value)) {
-    throw new RpcError(`Invalid RPC payload: ${label} is not an int`, { url: "", method: "" });
+    throw new RpcError("rpc_invalid_payload", `Invalid RPC payload: ${label} is not an int`, {
+      url: "",
+      method: "",
+    });
   }
   if (value < -2147483648 || value > 2147483647) {
-    throw new RpcError(`Invalid RPC payload: ${label} is not int32`, { url: "", method: "" });
+    throw new RpcError("rpc_invalid_payload", `Invalid RPC payload: ${label} is not int32`, {
+      url: "",
+      method: "",
+    });
   }
   return value;
 }
@@ -484,7 +497,7 @@ function expectInt32(value: unknown, label: string): number {
 function parseJsonInteger(value: unknown, label: string): bigint {
   if (typeof value === "number") {
     if (!Number.isFinite(value) || !Number.isInteger(value)) {
-      throw new RpcError(`Invalid RPC payload: ${label} is not an integer`, {
+      throw new RpcError("rpc_invalid_payload", `Invalid RPC payload: ${label} is not an integer`, {
         url: "",
         method: "",
       });
@@ -493,23 +506,34 @@ function parseJsonInteger(value: unknown, label: string): bigint {
   }
   if (typeof value === "string") {
     if (!/^-?\d+$/.test(value)) {
-      throw new RpcError(`Invalid RPC payload: ${label} is not an integer string`, {
-        url: "",
-        method: "",
-      });
+      throw new RpcError(
+        "rpc_invalid_payload",
+        `Invalid RPC payload: ${label} is not an integer string`,
+        {
+          url: "",
+          method: "",
+        },
+      );
     }
     return BigInt(value);
   }
-  throw new RpcError(`Invalid RPC payload: ${label} is not an integer`, { url: "", method: "" });
+  throw new RpcError("rpc_invalid_payload", `Invalid RPC payload: ${label} is not an integer`, {
+    url: "",
+    method: "",
+  });
 }
 
 function parseJsonBigintString(value: unknown, label: string): bigint {
   const text = expectString(value, label);
   if (!/^-?\d+$/.test(text)) {
-    throw new RpcError(`Invalid RPC payload: ${label} is not a decimal string`, {
-      url: "",
-      method: "",
-    });
+    throw new RpcError(
+      "rpc_invalid_payload",
+      `Invalid RPC payload: ${label} is not a decimal string`,
+      {
+        url: "",
+        method: "",
+      },
+    );
   }
   return BigInt(text);
 }
@@ -544,10 +568,14 @@ function parseQueryTransaction(value: unknown, label: string): QueryTransaction 
     return { ...tx, moneyFlew: obj.moneyFlew };
   }
   if (obj.moneyFlew === undefined) return tx;
-  throw new RpcError(`Invalid RPC payload: ${label}.moneyFlew is not boolean`, {
-    url: "",
-    method: "",
-  });
+  throw new RpcError(
+    "rpc_invalid_payload",
+    `Invalid RPC payload: ${label}.moneyFlew is not boolean`,
+    {
+      url: "",
+      method: "",
+    },
+  );
 }
 
 function serializeIdentityTxQuery(input: TransactionsForIdentityRequest): Record<string, unknown> {

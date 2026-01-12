@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { createRpcClient } from "../rpc/client.js";
+import type { FetchLike } from "../http.js";
 import {
   createTxConfirmationHelpers,
   TxConfirmationTimeoutError,
@@ -10,7 +11,7 @@ function createTestFetch() {
   let lastProcessed = 0;
   let getTxCalls = 0;
 
-  return async (...args: Parameters<typeof fetch>) => {
+  return async (...args: Parameters<FetchLike>) => {
     const url = new URL(getUrl(args[0]));
     const method = getMethod(args[0], args[1]);
 
@@ -71,7 +72,7 @@ describe("tx confirmation", () => {
   });
 
   it("throws TxNotFoundError if target tick is reached but tx stays 404", async () => {
-    const fetch: typeof globalThis.fetch = async (...args) => {
+    const fetch: FetchLike = async (...args) => {
       const url = new URL(getUrl(args[0]));
       const method = getMethod(args[0], args[1]);
       if (method === "GET" && url.pathname === "/query/v1/getLastProcessedTick") {
@@ -95,7 +96,7 @@ describe("tx confirmation", () => {
   });
 
   it("throws TxConfirmationTimeoutError if lastProcessedTick never reaches target", async () => {
-    const fetch: typeof globalThis.fetch = async (...args) => {
+    const fetch: FetchLike = async (...args) => {
       const url = new URL(getUrl(args[0]));
       const method = getMethod(args[0], args[1]);
       if (method === "GET" && url.pathname === "/query/v1/getLastProcessedTick") {

@@ -1,6 +1,7 @@
 import { createAssetsHelpers } from "./assets.js";
 import { createBobClient } from "./bob/client.js";
 import { createContractHelpers } from "./contracts.js";
+import type { FetchLike } from "./http.js";
 import { createRpcClient } from "./rpc/client.js";
 import { createTickHelpers } from "./tick.js";
 import { createTransactionHelpers } from "./transactions.js";
@@ -14,7 +15,7 @@ export type SdkConfig = Readonly<{
   /** Partner RPC base URL (recommended: `https://rpc.qubic.org`). */
   baseUrl?: string;
   /** Optional custom fetch implementation (for testing, instrumentation, etc). */
-  fetch?: typeof fetch;
+  fetch?: FetchLike;
   tick?: Readonly<{
     minOffset?: bigint | number;
     defaultOffset?: bigint | number;
@@ -37,7 +38,7 @@ export type SdkConfig = Readonly<{
   }>;
   bob?: Readonly<{
     baseUrl?: string;
-    fetch?: typeof fetch;
+    fetch?: FetchLike;
     headers?: Readonly<Record<string, string>>;
   }>;
 }>;

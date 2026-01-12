@@ -1,9 +1,10 @@
 import { SdkError } from "../errors.js";
+import type { FetchLike } from "../http.js";
 
 export type BobClientConfig = Readonly<{
   /** Base URL for QubicBob (default: http://localhost:40420). */
   baseUrl?: string;
-  fetch?: typeof fetch;
+  fetch?: FetchLike;
   headers?: Readonly<Record<string, string>>;
   onRequest?: (info: Readonly<{ url: string; method: string; body?: unknown }>) => void;
   onResponse?: (

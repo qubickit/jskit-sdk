@@ -1,11 +1,12 @@
 import { describe, expect, it } from "bun:test";
 import { createContractHelpers } from "./contracts.js";
+import type { FetchLike } from "./http.js";
 import { createRpcClient } from "./rpc/client.js";
 
 function createQueryFetch(responses: Uint8Array[]) {
   let calls = 0;
   const history = { calls: 0 };
-  const fetch: typeof globalThis.fetch = async (...args) => {
+  const fetch: FetchLike = async (...args) => {
     const url = new URL(getUrl(args[0]));
     const method = getMethod(args[0], args[1]);
     if (method === "POST" && url.pathname === "/live/v1/querySmartContract") {

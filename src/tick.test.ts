@@ -34,6 +34,12 @@ function createMockRpc(tick: bigint): RpcClient {
       async getTickData() {
         throw new Error("not implemented");
       },
+      async getProcessedTickIntervals() {
+        throw new Error("not implemented");
+      },
+      async getComputorListsForEpoch() {
+        throw new Error("not implemented");
+      },
     },
   };
 }
