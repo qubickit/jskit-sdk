@@ -11,5 +11,6 @@ describe("sdk scaffold", () => {
     expect(sdk).toHaveProperty("transactions");
     expect(sdk).toHaveProperty("transfers");
     expect(sdk).toHaveProperty("contracts");
+    expect(sdk).toHaveProperty("bob");
   });
 });

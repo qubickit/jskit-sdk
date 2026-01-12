@@ -5,6 +5,7 @@ High-level SDK for Qubic apps. This package composes `@qubic-labs/core` and will
 - RPC clients (Query/Live)
 - Transaction workflows (tick selection, per-source TxQueue)
 - Contract helpers and ergonomic domain APIs
+- QubicBob indexer client + log streaming helpers
 
 Core primitives/codecs/transports live in `@qubic-labs/core`.
 
@@ -42,6 +43,7 @@ const sdk = createSdk({
   tick: { defaultOffset: 15 }, // currentTick + 15
   tx: { confirmTimeoutMs: 60_000, confirmPollIntervalMs: 1_000 },
   txQueue: { enabled: true, policy: "waitForConfirm" },
+  bob: { baseUrl: "http://localhost:40420" },
 });
 const tickInfo = await sdk.rpc.live.tickInfo();
 const targetTick = await sdk.tick.getSuggestedTargetTick(); // currentTick + 15
@@ -87,6 +89,16 @@ const targetTick = await sdk.tick.getSuggestedTargetTick(); // currentTick + 15
 //   inputType: 1,
 //   inputBytes: new Uint8Array(),
 //   expectedOutputSize: 32,
+// });
+
+// QubicBob REST client
+// const status = await sdk.bob.status();
+
+// QubicBob log stream (WS)
+// const stream = createLogStream({
+//   baseUrl: "http://localhost:40420",
+//   subscriptions: [{ scIndex: 0, logType: 0 }],
+//   onLog: (msg) => console.log(msg),
 // });
 ```
 

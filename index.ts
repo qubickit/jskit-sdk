@@ -16,6 +16,24 @@ export { createRpcClient, RpcError } from "./src/rpc/client.js";
 export type { SdkConfig } from "./src/sdk.js";
 export { createSdk } from "./src/sdk.js";
 export type {
+  BobClient,
+  BobClientConfig,
+  BobQuerySmartContractInput,
+  BobQuerySmartContractResult,
+} from "./src/bob/client.js";
+export { BobError, createBobClient } from "./src/bob/client.js";
+export type {
+  EventLike,
+  LogCursor,
+  LogCursorStore,
+  LogStream,
+  LogStreamConfig,
+  LogStreamHandlers,
+  LogSubscription,
+  WebSocketLike,
+} from "./src/bob/log-stream.js";
+export { createLogStream } from "./src/bob/log-stream.js";
+export type {
   ContractsHelpers,
   ContractsHelpersConfig,
   QueryRawInput,
