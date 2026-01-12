@@ -103,6 +103,22 @@ function createTestFetch(): FetchLike {
       });
     }
 
+    if (method === "POST" && url.pathname === "/query/v1/getTransactionsForIdentity") {
+      const body = readJsonBody(input, init);
+      const pagination =
+        body.pagination && typeof body.pagination === "object"
+          ? (body.pagination as Record<string, unknown>)
+          : {};
+      const offset = Number(pagination.offset ?? 0);
+      const size = Number(pagination.size ?? 100);
+      const transactions = baseTransactions().slice(offset, offset + size);
+      return Response.json({
+        validForTick: 10,
+        hits: { total: baseTransactions().length, from: offset, size },
+        transactions,
+      });
+    }
+
     return new Response("not found", { status: 404 });
   };
 }
@@ -189,6 +205,46 @@ describe("rpc client", () => {
     expect(errors.length).toBe(1);
     expect(errors[0]?.code).toBe("rpc_request_failed");
   });
+
+  it("retries failed requests based on retry config", async () => {
+    let attempts = 0;
+    const fetch: FetchLike = async (input, init) => {
+      const url = new URL(getUrl(input));
+      const method = getMethod(input, init);
+      if (method === "GET" && url.pathname === "/live/v1/tick-info") {
+        attempts += 1;
+        if (attempts < 2) {
+          return new Response("temporarily unavailable", { status: 503 });
+        }
+        return Response.json({
+          tickInfo: { tick: 123, duration: 1500, epoch: 12, initialTick: 100 },
+        });
+      }
+      return new Response("not found", { status: 404 });
+    };
+    const rpc = createRpcClient({
+      baseUrl: "https://example.test",
+      fetch,
+      retry: { maxRetries: 2, baseDelayMs: 1, jitterMs: 0 },
+    });
+    const tickInfo = await rpc.live.tickInfo();
+    expect(attempts).toBe(2);
+    expect(tickInfo.tick).toBe(123n);
+  });
+
+  it("paginates transactions for identity", async () => {
+    const rpc = createRpcClient({
+      baseUrl: "https://example.test",
+      fetch: createTestFetch(),
+    });
+    const res = await rpc.query.getTransactionsForIdentityAll({
+      identity: "ID",
+      pageSize: 2,
+    });
+    expect(res.length).toBe(3);
+    expect(res[0]?.hash).toBe("tx0");
+    expect(res[2]?.hash).toBe("tx2");
+  });
 });
 
 function mustGet<T>(arr: readonly T[], index: number): T {
@@ -222,4 +278,45 @@ function readJsonBody(
   }
   if (!body) return {};
   throw new Error("Unsupported body type");
+}
+
+function baseTransactions() {
+  return [
+    {
+      hash: "tx0",
+      amount: "1",
+      source: "A",
+      destination: "B",
+      tickNumber: 1,
+      timestamp: "0",
+      inputType: 0,
+      inputSize: 0,
+      inputData: "",
+      signature: "",
+    },
+    {
+      hash: "tx1",
+      amount: "2",
+      source: "A",
+      destination: "B",
+      tickNumber: 2,
+      timestamp: "0",
+      inputType: 0,
+      inputSize: 0,
+      inputData: "",
+      signature: "",
+    },
+    {
+      hash: "tx2",
+      amount: "3",
+      source: "A",
+      destination: "B",
+      tickNumber: 3,
+      timestamp: "0",
+      inputType: 0,
+      inputSize: 0,
+      inputData: "",
+      signature: "",
+    },
+  ];
 }

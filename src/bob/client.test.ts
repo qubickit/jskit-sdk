@@ -54,6 +54,31 @@ describe("bob client", () => {
     expect(res.pending).toBe(true);
     expect(res.message).toBe("try later");
   });
+
+  it("retries failed requests based on retry config", async () => {
+    let attempts = 0;
+    const fetch: FetchLike = async (...args) => {
+      const url = new URL(getUrl(args[0]));
+      const method = getMethod(args[0], args[1]);
+      if (method === "GET" && url.pathname === "/status") {
+        attempts += 1;
+        if (attempts < 2) {
+          return new Response("temporary", { status: 503 });
+        }
+        return Response.json({ ok: true });
+      }
+      return new Response("not found", { status: 404 });
+    };
+
+    const bob = createBobClient({
+      baseUrl: "http://example.test",
+      fetch,
+      retry: { maxRetries: 2, baseDelayMs: 1, jitterMs: 0 },
+    });
+    const res = await bob.status();
+    expect(attempts).toBe(2);
+    expect(res).toEqual({ ok: true });
+  });
 });
 
 function getUrl(input: Parameters<typeof fetch>[0]): string {

@@ -1,11 +1,13 @@
 import { SdkError } from "../errors.js";
 import type { FetchLike } from "../http.js";
+import { normalizeRetryConfig, type RetryConfig, withRetry } from "../retry.js";
 
 export type BobClientConfig = Readonly<{
   /** Base URL for QubicBob (default: http://localhost:40420). */
   baseUrl?: string;
   fetch?: FetchLike;
   headers?: Readonly<Record<string, string>>;
+  retry?: RetryConfig;
   onRequest?: (info: Readonly<{ url: string; method: string; body?: unknown }>) => void;
   onResponse?: (
     info: Readonly<{
@@ -110,64 +112,87 @@ export function createBobClient(config: BobClientConfig = {}): BobClient {
   const baseUrl = ensureTrailingSlash(config.baseUrl ?? "http://localhost:40420");
   const base = new URL(baseUrl);
   const doFetch = config.fetch ?? fetch;
+  const retryConfig = normalizeRetryConfig(config.retry);
 
   const requestJson = async (method: string, url: URL, body?: unknown): Promise<unknown> => {
-    const start = Date.now();
-    const headers: Record<string, string> = {
-      accept: "application/json",
-      ...config.headers,
-    };
-    let bodyText: string | undefined;
-    if (body !== undefined) {
-      headers["content-type"] = "application/json";
-      bodyText = JSON.stringify(body);
-    }
-
-    config.onRequest?.({ url: url.toString(), method, body });
-    const res = await doFetch(url, {
+    return withRetry(
+      retryConfig,
       method,
-      headers,
-      body: bodyText,
-    });
-    config.onResponse?.({
-      url: url.toString(),
-      method,
-      status: res.status,
-      ok: res.ok,
-      durationMs: Date.now() - start,
-    });
+      async () => {
+        const start = Date.now();
+        const headers: Record<string, string> = {
+          accept: "application/json",
+          ...config.headers,
+        };
+        let bodyText: string | undefined;
+        if (body !== undefined) {
+          headers["content-type"] = "application/json";
+          bodyText = JSON.stringify(body);
+        }
 
-    const text = await res.text();
-    if (!res.ok) {
-      const error = new BobError(
-        "bob_request_failed",
-        `QubicBob request failed: ${res.status} ${res.statusText}`,
-        {
-          url: url.toString(),
-          method,
-          status: res.status,
-          statusText: res.statusText,
-          bodyText: text || undefined,
-        },
-      );
-      config.onError?.(error);
-      throw error;
-    }
+        try {
+          config.onRequest?.({ url: url.toString(), method, body });
+          const res = await doFetch(url, {
+            method,
+            headers,
+            body: bodyText,
+          });
+          config.onResponse?.({
+            url: url.toString(),
+            method,
+            status: res.status,
+            ok: res.ok,
+            durationMs: Date.now() - start,
+          });
 
-    if (text.length === 0) return null;
-    try {
-      return JSON.parse(text) as unknown;
-    } catch {
-      const error = new BobError("bob_invalid_json", "QubicBob response was not valid JSON", {
-        url: url.toString(),
-        method,
-        status: res.status,
-        statusText: res.statusText,
-        bodyText: text || undefined,
-      });
-      config.onError?.(error);
-      throw error;
-    }
+          const text = await res.text();
+          if (!res.ok) {
+            const error = new BobError(
+              "bob_request_failed",
+              `QubicBob request failed: ${res.status} ${res.statusText}`,
+              {
+                url: url.toString(),
+                method,
+                status: res.status,
+                statusText: res.statusText,
+                bodyText: text || undefined,
+              },
+            );
+            config.onError?.(error);
+            throw error;
+          }
+
+          if (text.length === 0) return null;
+          try {
+            return JSON.parse(text) as unknown;
+          } catch {
+            const error = new BobError("bob_invalid_json", "QubicBob response was not valid JSON", {
+              url: url.toString(),
+              method,
+              status: res.status,
+              statusText: res.statusText,
+              bodyText: text || undefined,
+            });
+            config.onError?.(error);
+            throw error;
+          }
+        } catch (error) {
+          if (error instanceof BobError) throw error;
+          const wrapped = new BobError(
+            "bob_fetch_error",
+            "QubicBob fetch failed",
+            {
+              url: url.toString(),
+              method,
+            },
+            error,
+          );
+          config.onError?.(wrapped);
+          throw wrapped;
+        }
+      },
+      (error) => shouldRetryBob(error, retryConfig),
+    );
   };
 
   return {
@@ -240,65 +265,76 @@ export function createBobClient(config: BobClientConfig = {}): BobClient {
         data: dataHex,
       });
 
-      const start = Date.now();
-      config.onRequest?.({ url: url.toString(), method: "POST", body: JSON.parse(bodyText) });
-      const res = await doFetch(url, { method: "POST", headers, body: bodyText });
-      config.onResponse?.({
-        url: url.toString(),
-        method: "POST",
-        status: res.status,
-        ok: res.ok,
-        durationMs: Date.now() - start,
-      });
-      const text = await res.text();
-      let json: unknown = null;
-      if (text.length) {
-        try {
-          json = JSON.parse(text) as unknown;
-        } catch {
-          const error = new BobError("bob_invalid_json", "QubicBob response was not valid JSON", {
+      return withRetry(
+        retryConfig,
+        "POST",
+        async () => {
+          const start = Date.now();
+          config.onRequest?.({ url: url.toString(), method: "POST", body: JSON.parse(bodyText) });
+          const res = await doFetch(url, { method: "POST", headers, body: bodyText });
+          config.onResponse?.({
             url: url.toString(),
             method: "POST",
             status: res.status,
-            statusText: res.statusText,
-            bodyText: text || undefined,
+            ok: res.ok,
+            durationMs: Date.now() - start,
           });
-          config.onError?.(error);
-          throw error;
-        }
-      }
+          const text = await res.text();
+          let json: unknown = null;
+          if (text.length) {
+            try {
+              json = JSON.parse(text) as unknown;
+            } catch {
+              const error = new BobError(
+                "bob_invalid_json",
+                "QubicBob response was not valid JSON",
+                {
+                  url: url.toString(),
+                  method: "POST",
+                  status: res.status,
+                  statusText: res.statusText,
+                  bodyText: text || undefined,
+                },
+              );
+              config.onError?.(error);
+              throw error;
+            }
+          }
 
-      if (res.status === 202) {
-        const obj = expectObject(json);
-        return {
-          nonce,
-          pending: true,
-          message: typeof obj.message === "string" ? obj.message : "pending",
-        };
-      }
+          if (res.status === 202) {
+            const obj = expectObject(json);
+            return {
+              nonce,
+              pending: true,
+              message: typeof obj.message === "string" ? obj.message : "pending",
+            };
+          }
 
-      if (!res.ok) {
-        const error = new BobError(
-          "bob_request_failed",
-          `QubicBob request failed: ${res.status} ${res.statusText}`,
-          {
-            url: url.toString(),
-            method: "POST",
-            status: res.status,
-            statusText: res.statusText,
-            bodyText: text || undefined,
-          },
-        );
-        config.onError?.(error);
-        throw error;
-      }
+          if (!res.ok) {
+            const error = new BobError(
+              "bob_request_failed",
+              `QubicBob request failed: ${res.status} ${res.statusText}`,
+              {
+                url: url.toString(),
+                method: "POST",
+                status: res.status,
+                statusText: res.statusText,
+                bodyText: text || undefined,
+              },
+            );
+            config.onError?.(error);
+            throw error;
+          }
 
-      const obj = expectObject(json);
-      return {
-        nonce,
-        pending: false,
-        dataHex: typeof obj.data === "string" ? obj.data : undefined,
-      };
+          const obj = expectObject(json);
+          return {
+            nonce,
+            pending: false,
+            dataHex: typeof obj.data === "string" ? obj.data : undefined,
+          };
+        },
+        (error) => shouldRetryBob(error, retryConfig),
+      );
     },
 
     async broadcastTransaction(input): Promise<unknown> {
@@ -347,4 +383,11 @@ function randomUint32(): number {
     return buf[0] ?? 0;
   }
   return Math.floor(Math.random() * 0xffff_ffff);
+}
+
+function shouldRetryBob(error: unknown, config: ReturnType<typeof normalizeRetryConfig>): boolean {
+  if (!(error instanceof BobError)) return false;
+  if (error.code === "bob_fetch_error") return true;
+  const status = error.details.status;
+  return typeof status === "number" && config.retryOnStatuses.includes(status);
 }

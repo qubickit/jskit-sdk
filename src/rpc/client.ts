@@ -1,5 +1,6 @@
 import { SdkError } from "../errors.js";
 import type { FetchLike } from "../http.js";
+import { normalizeRetryConfig, type RetryConfig, withRetry } from "../retry.js";
 
 export type RpcClientConfig = Readonly<{
   /**
@@ -10,6 +11,7 @@ export type RpcClientConfig = Readonly<{
   baseUrl?: string;
   fetch?: FetchLike;
   headers?: Readonly<Record<string, string>>;
+  retry?: RetryConfig;
   onRequest?: (info: Readonly<{ url: string; method: string; body?: unknown }>) => void;
   onResponse?: (
     info: Readonly<{
@@ -118,6 +120,13 @@ export type TransactionsForIdentityRequest = Readonly<{
   pagination?: Pagination;
 }>;
 
+export type TransactionsForIdentityPagingInput = TransactionsForIdentityRequest &
+  Readonly<{
+    pageSize?: bigint | number;
+    limit?: bigint | number;
+    offset?: bigint | number;
+  }>;
+
 export type TransactionsForIdentityResponse = Readonly<{
   validForTick: bigint;
   hits: Hits;
@@ -153,6 +162,12 @@ export type RpcClient = Readonly<{
     getTransactionsForIdentity(
       input: TransactionsForIdentityRequest,
     ): Promise<TransactionsForIdentityResponse>;
+    getTransactionsForIdentityPages(
+      input: TransactionsForIdentityPagingInput,
+    ): AsyncGenerator<TransactionsForIdentityResponse, void, void>;
+    getTransactionsForIdentityAll(
+      input: TransactionsForIdentityPagingInput,
+    ): Promise<readonly QueryTransaction[]>;
     getTransactionsForTick(tickNumber: bigint | number): Promise<readonly QueryTransaction[]>;
     getTickData(tickNumber: bigint | number): Promise<TickData>;
     getProcessedTickIntervals(): Promise<readonly ProcessedTickInterval[]>;
@@ -164,64 +179,87 @@ export function createRpcClient(config: RpcClientConfig = {}): RpcClient {
   const baseUrl = normalizeRpcBaseUrl(config.baseUrl ?? "https://rpc.qubic.org");
   const base = new URL(ensureTrailingSlash(baseUrl));
   const doFetch = config.fetch ?? fetch;
+  const retryConfig = normalizeRetryConfig(config.retry);
 
   const requestJson = async (method: string, url: URL, body?: unknown): Promise<unknown> => {
-    const start = Date.now();
-    const headers: Record<string, string> = {
-      accept: "application/json",
-      ...config.headers,
-    };
-    let bodyText: string | undefined;
-    if (body !== undefined) {
-      headers["content-type"] = "application/json";
-      bodyText = JSON.stringify(body);
-    }
-
-    config.onRequest?.({ url: url.toString(), method, body });
-    const res = await doFetch(url, {
+    return withRetry(
+      retryConfig,
       method,
-      headers,
-      body: bodyText,
-    });
-    config.onResponse?.({
-      url: url.toString(),
-      method,
-      status: res.status,
-      ok: res.ok,
-      durationMs: Date.now() - start,
-    });
+      async () => {
+        const start = Date.now();
+        const headers: Record<string, string> = {
+          accept: "application/json",
+          ...config.headers,
+        };
+        let bodyText: string | undefined;
+        if (body !== undefined) {
+          headers["content-type"] = "application/json";
+          bodyText = JSON.stringify(body);
+        }
 
-    const text = await res.text();
-    if (!res.ok) {
-      const error = new RpcError(
-        "rpc_request_failed",
-        `RPC request failed: ${res.status} ${res.statusText}`,
-        {
-          url: url.toString(),
-          method,
-          status: res.status,
-          statusText: res.statusText,
-          bodyText: text || undefined,
-        },
-      );
-      config.onError?.(error);
-      throw error;
-    }
+        try {
+          config.onRequest?.({ url: url.toString(), method, body });
+          const res = await doFetch(url, {
+            method,
+            headers,
+            body: bodyText,
+          });
+          config.onResponse?.({
+            url: url.toString(),
+            method,
+            status: res.status,
+            ok: res.ok,
+            durationMs: Date.now() - start,
+          });
 
-    if (text.length === 0) return null;
-    try {
-      return JSON.parse(text) as unknown;
-    } catch {
-      const error = new RpcError("rpc_invalid_json", "RPC response was not valid JSON", {
-        url: url.toString(),
-        method,
-        status: res.status,
-        statusText: res.statusText,
-        bodyText: text || undefined,
-      });
-      config.onError?.(error);
-      throw error;
-    }
+          const text = await res.text();
+          if (!res.ok) {
+            const error = new RpcError(
+              "rpc_request_failed",
+              `RPC request failed: ${res.status} ${res.statusText}`,
+              {
+                url: url.toString(),
+                method,
+                status: res.status,
+                statusText: res.statusText,
+                bodyText: text || undefined,
+              },
+            );
+            config.onError?.(error);
+            throw error;
+          }
+
+          if (text.length === 0) return null;
+          try {
+            return JSON.parse(text) as unknown;
+          } catch {
+            const error = new RpcError("rpc_invalid_json", "RPC response was not valid JSON", {
+              url: url.toString(),
+              method,
+              status: res.status,
+              statusText: res.statusText,
+              bodyText: text || undefined,
+            });
+            config.onError?.(error);
+            throw error;
+          }
+        } catch (error) {
+          if (error instanceof RpcError) throw error;
+          const wrapped = new RpcError(
+            "rpc_fetch_error",
+            "RPC fetch failed",
+            {
+              url: url.toString(),
+              method,
+            },
+            error,
+          );
+          config.onError?.(wrapped);
+          throw wrapped;
+        }
+      },
+      (error) => shouldRetryRpc(error, retryConfig),
+    );
   };
 
   const live = {
@@ -409,9 +447,63 @@ export function createRpcClient(config: RpcClientConfig = {}): RpcClient {
         };
       });
     },
+    async *getTransactionsForIdentityPages(
+      input: TransactionsForIdentityPagingInput,
+    ): AsyncGenerator<TransactionsForIdentityResponse, void, void> {
+      let offset = toBigintPagination(input.offset ?? input.pagination?.offset ?? 0);
+      const pageSize = toBigintPagination(input.pageSize ?? input.pagination?.size ?? 100);
+      const limit = input.limit !== undefined ? toBigintPagination(input.limit) : undefined;
+      let consumed = 0n;
+
+      while (true) {
+        if (limit !== undefined && consumed >= limit) return;
+        const remaining = limit !== undefined ? limit - consumed : undefined;
+        const size = remaining !== undefined ? minBigint(pageSize, remaining) : pageSize;
+        const response = await query.getTransactionsForIdentity({
+          identity: input.identity,
+          filters: input.filters,
+          ranges: input.ranges,
+          pagination: { offset, size },
+        });
+        yield response;
+        const got = BigInt(response.transactions.length);
+        consumed += got;
+        if (got === 0n) return;
+        offset += got;
+        if (offset >= response.hits.total) return;
+      }
+    },
+    async getTransactionsForIdentityAll(
+      input: TransactionsForIdentityPagingInput,
+    ): Promise<readonly QueryTransaction[]> {
+      const out: QueryTransaction[] = [];
+      for await (const page of query.getTransactionsForIdentityPages(input)) {
+        out.push(...page.transactions);
+      }
+      return out;
+    },
   } as const;
 
   return { live, query };
+}
+
+function shouldRetryRpc(error: unknown, config: ReturnType<typeof normalizeRetryConfig>): boolean {
+  if (!(error instanceof RpcError)) return false;
+  if (error.code === "rpc_fetch_error") return true;
+  const status = error.details.status;
+  return typeof status === "number" && config.retryOnStatuses.includes(status);
+}
+
+function toBigintPagination(value: bigint | number): bigint {
+  if (typeof value === "bigint") return value;
+  if (!Number.isFinite(value) || !Number.isInteger(value)) {
+    throw new TypeError("Pagination value must be an integer");
+  }
+  return BigInt(value);
+}
+
+function minBigint(a: bigint, b: bigint): bigint {
+  return a < b ? a : b;
 }
 
 function normalizeRpcBaseUrl(input: string): string {

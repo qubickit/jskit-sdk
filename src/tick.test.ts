@@ -28,6 +28,13 @@ function createMockRpc(tick: bigint): RpcClient {
       async getTransactionsForIdentity() {
         throw new Error("not implemented");
       },
+      async *getTransactionsForIdentityPages() {
+        yield* [];
+        throw new Error("not implemented");
+      },
+      async getTransactionsForIdentityAll() {
+        throw new Error("not implemented");
+      },
       async getTransactionsForTick() {
         throw new Error("not implemented");
       },

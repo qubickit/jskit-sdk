@@ -3,6 +3,7 @@ import { createBobClient } from "./bob/client.js";
 import { createContractHelpers } from "./contracts.js";
 import type { FetchLike } from "./http.js";
 import { createQbiHelpers, createQbiRegistry, type QbiCodecRegistry, type QbiFile } from "./qbi.js";
+import type { RetryConfig } from "./retry.js";
 import { createRpcClient } from "./rpc/client.js";
 import { createTickHelpers } from "./tick.js";
 import { createTransactionHelpers } from "./transactions.js";
@@ -18,6 +19,10 @@ export type SdkConfig = Readonly<{
   baseUrl?: string;
   /** Optional custom fetch implementation (for testing, instrumentation, etc). */
   fetch?: FetchLike;
+  rpc?: Readonly<{
+    headers?: Readonly<Record<string, string>>;
+    retry?: RetryConfig;
+  }>;
   tick?: Readonly<{
     minOffset?: bigint | number;
     defaultOffset?: bigint | number;
@@ -47,11 +52,17 @@ export type SdkConfig = Readonly<{
     baseUrl?: string;
     fetch?: FetchLike;
     headers?: Readonly<Record<string, string>>;
+    retry?: RetryConfig;
   }>;
 }>;
 
 export function createSdk(config: SdkConfig = {}) {
-  const rpc = createRpcClient({ baseUrl: config.baseUrl, fetch: config.fetch });
+  const rpc = createRpcClient({
+    baseUrl: config.baseUrl,
+    fetch: config.fetch,
+    headers: config.rpc?.headers,
+    retry: config.rpc?.retry,
+  });
   const tick = createTickHelpers({
     rpc,
     minOffset: config.tick?.minOffset,
@@ -103,6 +114,7 @@ export function createSdk(config: SdkConfig = {}) {
     baseUrl: config.bob?.baseUrl,
     fetch: config.bob?.fetch ?? config.fetch,
     headers: config.bob?.headers,
+    retry: config.bob?.retry,
   });
   const vault = config.vault;
   return {

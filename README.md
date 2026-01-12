@@ -44,6 +44,7 @@ const sdk = createSdk({
   tx: { confirmTimeoutMs: 60_000, confirmPollIntervalMs: 1_000 },
   txQueue: { enabled: true, policy: "waitForConfirm" },
   bob: { baseUrl: "http://localhost:40420" },
+  // rpc: { retry: { maxRetries: 2, baseDelayMs: 250 } },
   // assets: { requestAssets: yourRequestAssetsFn },
 });
 const tickInfo = await sdk.rpc.live.tickInfo();

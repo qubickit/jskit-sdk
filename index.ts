@@ -64,6 +64,7 @@ export {
   QbiEntryNotFoundError,
   QbiError,
 } from "./src/qbi.js";
+export type { RetryConfig } from "./src/retry.js";
 export type {
   BroadcastTransactionResult,
   ComputorList,
@@ -75,6 +76,7 @@ export type {
   RpcClientConfig,
   TickData,
   TickInfo,
+  TransactionsForIdentityPagingInput,
   TransactionsForIdentityRequest,
   TransactionsForIdentityResponse,
 } from "./src/rpc/client.js";
