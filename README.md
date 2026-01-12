@@ -44,6 +44,7 @@ const sdk = createSdk({
   tx: { confirmTimeoutMs: 60_000, confirmPollIntervalMs: 1_000 },
   txQueue: { enabled: true, policy: "waitForConfirm" },
   bob: { baseUrl: "http://localhost:40420" },
+  // assets: { requestAssets: yourRequestAssetsFn },
 });
 const tickInfo = await sdk.rpc.live.tickInfo();
 const targetTick = await sdk.tick.getSuggestedTargetTick(); // currentTick + 15
@@ -100,6 +101,9 @@ const targetTick = await sdk.tick.getSuggestedTargetTick(); // currentTick + 15
 //   subscriptions: [{ scIndex: 0, logType: 0 }],
 //   onLog: (msg) => console.log(msg),
 // });
+
+// Assets query (RequestAssets)
+// const assets = await sdk.assets?.listIssued({ issuerIdentity: "..." });
 ```
 
 ## Examples

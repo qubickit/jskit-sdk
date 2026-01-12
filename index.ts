@@ -40,6 +40,21 @@ export type {
   QueryRawResult,
 } from "./src/contracts.js";
 export { ContractQueryAbortedError, createContractHelpers } from "./src/contracts.js";
+export type {
+  AssetsHelpers,
+  AssetsHelpersConfig,
+  AssetsQueryInput,
+  AssetsRequestFn,
+  ListIssuedInput,
+  ListOwnedInput,
+  ListPossessedInput,
+} from "./src/assets.js";
+export {
+  createAssetsHelpers,
+  isIssuanceAsset,
+  isOwnershipAsset,
+  isPossessionAsset,
+} from "./src/assets.js";
 export type { SuggestedTargetTickInput, TickHelpers, TickHelpersConfig } from "./src/tick.js";
 export { createTickHelpers } from "./src/tick.js";
 export type {

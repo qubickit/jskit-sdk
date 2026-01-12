@@ -1,6 +1,7 @@
 import { createBobClient } from "./bob/client.js";
 import { createRpcClient } from "./rpc/client.js";
 import { createContractHelpers } from "./contracts.js";
+import { createAssetsHelpers } from "./assets.js";
 import { createTickHelpers } from "./tick.js";
 import { createTransactionHelpers } from "./transactions.js";
 import { createTransferHelpers } from "./transfers.js";
@@ -30,6 +31,9 @@ export type SdkConfig = Readonly<{
   contracts?: Readonly<{
     defaultRetries?: number;
     defaultRetryDelayMs?: number;
+  }>;
+  assets?: Readonly<{
+    requestAssets?: (request: Uint8Array, signal?: AbortSignal) => Promise<readonly Uint8Array[]>;
   }>;
   bob?: Readonly<{
     baseUrl?: string;
@@ -70,10 +74,13 @@ export function createSdk(config: SdkConfig = {}) {
 
   const transactions = createTransactionHelpers({ tick, tx, txQueue });
   const transfers = createTransferHelpers({ transactions });
+  const assets = config.assets?.requestAssets
+    ? createAssetsHelpers({ requestAssets: config.assets.requestAssets })
+    : undefined;
   const bob = createBobClient({
     baseUrl: config.bob?.baseUrl,
     fetch: config.bob?.fetch ?? config.fetch,
     headers: config.bob?.headers,
   });
-  return { rpc, tick, tx, txQueue, transactions, transfers, contracts, bob } as const;
+  return { rpc, tick, tx, txQueue, transactions, transfers, contracts, assets, bob } as const;
 }
