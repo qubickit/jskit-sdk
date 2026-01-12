@@ -37,4 +37,61 @@ describe("qbi helpers", () => {
     expect(lastInputType).toBe(1);
     expect(lastExpectedSize).toBe(16);
   });
+
+  it("builds a procedure transaction using contract identity", async () => {
+    const contracts: ContractsHelpers = {
+      async queryRaw() {
+        throw new Error("not used");
+      },
+      async querySmartContract() {
+        throw new Error("not used");
+      },
+    };
+    const registry = createQbiRegistry({
+      files: [
+        {
+          contract: {
+            name: "QX",
+            contractIndex: 1,
+            contractId: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFXIB",
+          },
+          entries: [{ kind: "procedure", name: "DoThing", inputType: 2, inputSize: 4 }],
+        },
+      ],
+    });
+
+    const qbi = createQbiHelpers({
+      contracts,
+      registry,
+      transactions: {
+        async buildSigned(input) {
+          return {
+            txBytes: new Uint8Array([1]),
+            txId: "tx",
+            targetTick: BigInt(input.targetTick ?? 0),
+          };
+        },
+        async send() {
+          throw new Error("not used");
+        },
+        async sendAndConfirm() {
+          throw new Error("not used");
+        },
+        async sendAndConfirmWithReceipt() {
+          throw new Error("not used");
+        },
+        async sendQueued() {
+          throw new Error("not used");
+        },
+      },
+    });
+
+    const built = await qbi.contract("QX").buildProcedureTransaction({
+      name: "DoThing",
+      fromSeed: "seed",
+      inputBytes: new Uint8Array([1, 2, 3, 4]),
+    });
+
+    expect(built.txId).toBe("tx");
+  });
 });

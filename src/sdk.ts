@@ -42,6 +42,8 @@ export type SdkConfig = Readonly<{
       contract: Readonly<{
         name: string;
         contractIndex?: number;
+        contractPublicKeyHex?: string;
+        contractId?: string;
       }>;
       entries: readonly Readonly<{
         kind: "function" | "procedure";
@@ -95,7 +97,11 @@ export function createSdk(config: SdkConfig = {}) {
     ? createAssetsHelpers({ requestAssets: config.assets.requestAssets })
     : undefined;
   const qbi = config.qbi?.files
-    ? createQbiHelpers({ contracts, registry: createQbiRegistry({ files: config.qbi.files }) })
+    ? createQbiHelpers({
+        contracts,
+        registry: createQbiRegistry({ files: config.qbi.files }),
+        transactions,
+      })
     : undefined;
   const bob = createBobClient({
     baseUrl: config.bob?.baseUrl,
