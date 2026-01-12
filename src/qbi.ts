@@ -68,13 +68,19 @@ type QbiFunctionInput<C, Name extends string> = QbiFunctionCodecs<C> extends Rec
     : unknown
   : unknown;
 
-type QbiFunctionOutput<C, Name extends string> = QbiFunctionCodecs<C> extends Record<string, unknown>
+type QbiFunctionOutput<C, Name extends string> = QbiFunctionCodecs<C> extends Record<
+  string,
+  unknown
+>
   ? Name extends keyof QbiFunctionCodecs<C>
     ? QbiCodecOutput<QbiFunctionCodecs<C>[Name]>
     : unknown
   : unknown;
 
-type QbiProcedureInput<C, Name extends string> = QbiProcedureCodecs<C> extends Record<string, unknown>
+type QbiProcedureInput<C, Name extends string> = QbiProcedureCodecs<C> extends Record<
+  string,
+  unknown
+>
   ? Name extends keyof QbiProcedureCodecs<C>
     ? QbiCodecInput<QbiProcedureCodecs<C>[Name]>
     : unknown
