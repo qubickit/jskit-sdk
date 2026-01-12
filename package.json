@@ -19,6 +19,8 @@
     "lint": "biome lint .",
     "test": "bun test",
     "examples:transfer": "bun run examples/transfer.ts",
+    "examples:send-many": "bun run examples/send-many.ts",
+    "examples:log-stream": "bun run examples/log-stream.ts",
     "prepack": "bun run build"
   },
   "devDependencies": {
