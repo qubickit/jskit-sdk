@@ -44,6 +44,7 @@ export type {
   QbiCodec,
   QbiCodecRegistry,
   QbiContractCodecs,
+  QbiContractHandle,
   QbiEntry,
   QbiFile,
   QbiHelpers,
@@ -132,7 +133,10 @@ export type {
   OpenSeedVaultInput,
   SeedVault,
   VaultEntry,
+  VaultEntryEncrypted,
   VaultExport,
+  VaultHeader,
+  VaultKdfParams,
   VaultSummary,
 } from "./src/vault/types.js";
 export {
