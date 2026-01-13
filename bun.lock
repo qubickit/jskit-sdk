@@ -6,7 +6,7 @@
       "name": "jskit-sdk",
       "dependencies": {
         "@noble/hashes": "^1.8.0",
-        "@qubic-labs/core": "^1.0.0",
+        "@qubic-labs/core": "^1.0.2",
       },
       "devDependencies": {
         "@biomejs/biome": "^2.3.11",
@@ -81,7 +81,9 @@
 
     "@pnpm/npm-conf": ["@pnpm/npm-conf@2.3.1", "", { "dependencies": { "@pnpm/config.env-replace": "^1.1.0", "@pnpm/network.ca-file": "^1.0.1", "config-chain": "^1.1.11" } }, "sha512-c83qWb22rNRuB0UaVCI0uRPNRr8Z0FWnEIvT47jiHAmOIUHbBOg5XvV7pM5x+rKn9HRpjxquDbXYSXr3fAKFcw=="],
 
-    "@qubic-labs/core": ["@qubic-labs/core@1.0.0", "", { "dependencies": { "@noble/hashes": "^1.8.0" }, "peerDependencies": { "typescript": "^5" } }, "sha512-1OXGLfw5zjk6V0FjKE97ZAXNRfps4sEum/xODWqKX6iiEJZJ2h10l2sGVesvzgoZm60HUwgMzk5kKdZPEqFhvA=="],
+    "@qubic-labs/core": ["@qubic-labs/core@1.0.2", "", { "dependencies": { "@noble/hashes": "^1.8.0", "@qubic-labs/schnorrq": "^1.0.2" }, "peerDependencies": { "typescript": "^5" } }, "sha512-vnAl1LKKo2rEOu4EQdeW1HATyWPLl5OW61vIrm5WQ7vmHKm7i2+Fye4vBDpUVhYmwBcQTNGXlr7Dc0vWC+PXMA=="],
+
+    "@qubic-labs/schnorrq": ["@qubic-labs/schnorrq@1.0.2", "", { "dependencies": { "@noble/hashes": "^1.8.0" }, "peerDependencies": { "typescript": "^5" } }, "sha512-5siomdXGgycQAGJXYIaKqS5EvbEKYYf6hfEShGBfaHw2R3hFxLCwZa8eF5EBHGlR4e8oMb1fkJVL6Eb1uZb86g=="],
 
     "@sec-ant/readable-stream": ["@sec-ant/readable-stream@0.4.1", "", {}, "sha512-831qok9r2t8AlxLko40y2ebgSDhenenCatLVeW/uBtnHPyhHOvG0C7TvfgecV+wHzIm5KUICgzmVpWS+IMEAeg=="],
 
