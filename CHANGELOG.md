@@ -1,3 +1,9 @@
+## [1.3.1](https://github.com/qubickit/jskit-sdk/compare/v1.3.0...v1.3.1) (2026-01-13)
+
+### Bug Fixes
+
+* **deps:** fix semantic r elease deps & force patch ([54079a6](https://github.com/qubickit/jskit-sdk/commit/54079a67c61f2952ab272179b6970dd7cc34f54d))
+
 ## [1.3.0](https://github.com/qubickit/jskit-sdk/compare/v1.2.0...v1.3.0) (2026-01-13)
 
 ### Features
