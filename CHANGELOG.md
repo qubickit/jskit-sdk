@@ -1,3 +1,11 @@
+## [1.3.0](https://github.com/qubickit/jskit-sdk/compare/v1.2.0...v1.3.0) (2026-01-13)
+
+### Features
+
+* **qbi:** add codec validation and errors ([4311bec](https://github.com/qubickit/jskit-sdk/commit/4311bec170bf128a9ac3abe97f20eb0c070714c4))
+* **rpc:** add retries and pagination helpers ([0c0779e](https://github.com/qubickit/jskit-sdk/commit/0c0779e8d4a9cab61893fe844097be49b1561627))
+* **vault:** add browser vault support ([6c67cba](https://github.com/qubickit/jskit-sdk/commit/6c67cbaf617df0b0d532cc9c30143bfc22553dd3))
+
 ## [1.2.0](https://github.com/qubickit/jskit-sdk/compare/v1.1.0...v1.2.0) (2026-01-12)
 
 ### Features
