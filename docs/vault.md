@@ -1,6 +1,6 @@
 # Seed Vault
 
-The seed vault stores one or more seeds in an encrypted JSON file protected by a passphrase. It is file-based (no network dependency), supports multiple identities, and works in both Node.js and Bun.
+The seed vault stores one or more seeds in an encrypted JSON blob protected by a passphrase. Node uses a file-based vault, while browsers use a storage-backed vault.
 
 ## Create or open a vault
 
@@ -61,6 +61,34 @@ await vault.rotatePassphrase("new-passphrase");
 ```ts
 const backup = vault.exportJson();
 await vault.importEncrypted(backup, { mode: "merge", sourcePassphrase: "secret" });
+```
+
+## Browser vaults
+
+Browser vaults use the same format but store data in a custom storage backend.
+
+```ts
+import { createLocalStorageVaultStore, openSeedVaultBrowser } from "@qubic-labs/sdk";
+
+const store = createLocalStorageVaultStore("qubic.vault");
+const vault = await openSeedVaultBrowser({
+  store,
+  passphrase: "secret",
+  create: true,
+});
+```
+
+Custom storage example:
+
+```ts
+const store = {
+  async read() {
+    return await loadFromIndexedDb();
+  },
+  async write(value: string) {
+    await saveToIndexedDb(value);
+  },
+};
 ```
 
 ## CLI

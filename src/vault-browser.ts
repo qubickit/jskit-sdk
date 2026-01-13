@@ -1,5 +1,5 @@
-import { createCipheriv, createDecipheriv, randomBytes, scrypt } from "node:crypto";
-import { access, open, readFile, rename, unlink, writeFile } from "node:fs/promises";
+import { scrypt } from "@noble/hashes/scrypt";
+import { utf8ToBytes } from "@noble/hashes/utils";
 import { identityFromSeed } from "@qubic-labs/core";
 import type {
   OpenSeedVaultInput,
@@ -19,22 +19,6 @@ import {
   VaultNotFoundError,
 } from "./vault/types.js";
 
-const scryptAsync = (
-  password: string,
-  salt: Buffer,
-  keylen: number,
-  options: Readonly<{ N: number; r: number; p: number }>,
-): Promise<Buffer> =>
-  new Promise((resolve, reject) => {
-    scrypt(password, salt, keylen, options, (error, derivedKey) => {
-      if (error) {
-        reject(error);
-        return;
-      }
-      resolve(derivedKey as Buffer);
-    });
-  });
-
 const DEFAULT_SCRYPT_PARAMS = Object.freeze({
   N: 1 << 13,
   r: 8,
@@ -43,46 +27,43 @@ const DEFAULT_SCRYPT_PARAMS = Object.freeze({
 });
 
 const AES_GCM_NONCE_BYTES = 12;
+const AES_GCM_TAG_BYTES = 16;
 const VAULT_VERSION = 1;
 
 type VaultFile = VaultHeader & Readonly<{ entries: readonly VaultEntry[] }>;
 
-export async function openSeedVault(input: OpenSeedVaultInput): Promise<SeedVault> {
-  const { path, passphrase } = input;
+export type VaultStore = Readonly<{
+  read(): Promise<string | null>;
+  write(value: string): Promise<void>;
+  remove?(): Promise<void>;
+  label?: string;
+}>;
+
+export type OpenSeedVaultBrowserInput = Omit<
+  OpenSeedVaultInput,
+  "path" | "lock" | "lockTimeoutMs"
+> &
+  Readonly<{
+    store: VaultStore;
+    path?: string;
+  }>;
+
+export async function openSeedVaultBrowser(input: OpenSeedVaultBrowserInput): Promise<SeedVault> {
+  const { store, passphrase } = input;
   const autoSave = input.autoSave ?? true;
-  const lockEnabled = input.lock ?? true;
-  const lockTimeoutMs = input.lockTimeoutMs ?? 0;
-  const lockPath = `${path}.lock`;
+  const path = input.path ?? store.label ?? "vault";
 
   let file: VaultFile | undefined;
-  let lockHandle: Awaited<ReturnType<typeof open>> | undefined;
-  let closed = false;
-
-  try {
-    if (lockEnabled) {
-      lockHandle = await acquireLock(lockPath, lockTimeoutMs);
-    }
-
-    try {
-      const raw = await readFile(path, "utf8");
-      file = parseVaultFile(raw);
-    } catch (error) {
-      if (!isNotFoundError(error)) {
-        throw error;
-      }
-      if (!input.create) {
-        throw new VaultNotFoundError(path);
-      }
-    }
-  } catch (error) {
-    await releaseLock(lockHandle, lockPath);
-    throw error;
-  }
+  const raw = await store.read();
+  if (raw) file = parseVaultFile(raw);
 
   if (!file) {
+    if (!input.create) {
+      throw new VaultNotFoundError(path);
+    }
     const params = createKdfParams(input.kdfParams);
     file = createEmptyVault(params);
-    await writeVaultFile(path, file);
+    await store.write(JSON.stringify(file, null, 2));
   }
 
   if (file.vaultVersion !== VAULT_VERSION) {
@@ -116,7 +97,7 @@ export async function openSeedVault(input: OpenSeedVaultInput): Promise<SeedVaul
       throw new VaultError("Vault not initialized");
     }
     const updated: VaultFile = { ...file, entries: Array.from(entries.values()) };
-    await writeVaultFile(path, updated);
+    await store.write(JSON.stringify(updated, null, 2));
     file = updated;
   };
 
@@ -136,7 +117,7 @@ export async function openSeedVault(input: OpenSeedVaultInput): Promise<SeedVaul
     }
 
     const identity = await identityFromSeed(seed, seedIndex);
-    const encrypted = encryptSeed(seed, key);
+    const encrypted = await encryptSeed(seed, key);
     const now = new Date().toISOString();
 
     const entry: VaultEntry = {
@@ -162,7 +143,7 @@ export async function openSeedVault(input: OpenSeedVaultInput): Promise<SeedVaul
   const getSeed = async (ref: string): Promise<string> => {
     const entry = findEntry(ref);
     try {
-      return decryptSeed(entry.encrypted, key);
+      return await decryptSeed(entry.encrypted, key);
     } catch {
       throw new VaultInvalidPassphraseError();
     }
@@ -189,10 +170,10 @@ export async function openSeedVault(input: OpenSeedVaultInput): Promise<SeedVaul
     const now = new Date().toISOString();
 
     for (const entry of entries.values()) {
-      const seed = decryptSeed(entry.encrypted, key);
+      const seed = await decryptSeed(entry.encrypted, key);
       entries.set(entry.name, {
         ...entry,
-        encrypted: encryptSeed(seed, nextKey),
+        encrypted: await encryptSeed(seed, nextKey),
         updatedAt: now,
       });
     }
@@ -203,7 +184,7 @@ export async function openSeedVault(input: OpenSeedVaultInput): Promise<SeedVaul
       entries: Array.from(entries.values()),
     };
     key = nextKey;
-    await writeVaultFile(path, file);
+    await save();
   };
 
   const exportEncrypted = (): VaultExport => {
@@ -227,8 +208,8 @@ export async function openSeedVault(input: OpenSeedVaultInput): Promise<SeedVaul
     const nextEntries = mode === "replace" ? new Map<string, VaultEntry>() : new Map(entries);
 
     for (const entry of source.entries) {
-      const seed = decryptSeed(entry.encrypted, sourceKey);
-      const encrypted = encryptSeed(seed, key);
+      const seed = await decryptSeed(entry.encrypted, sourceKey);
+      const encrypted = await encryptSeed(seed, key);
       nextEntries.set(entry.name, {
         name: entry.name,
         identity: entry.identity,
@@ -252,16 +233,8 @@ export async function openSeedVault(input: OpenSeedVaultInput): Promise<SeedVaul
   };
 
   const close = async (): Promise<void> => {
-    if (closed) return;
-    closed = true;
-    await releaseLock(lockHandle, lockPath);
+    return;
   };
-
-  if (lockHandle) {
-    registerExitHandler(async () => {
-      await releaseLock(lockHandle, lockPath);
-    });
-  }
 
   return {
     path,
@@ -282,6 +255,46 @@ export async function openSeedVault(input: OpenSeedVaultInput): Promise<SeedVaul
   };
 }
 
+export function createMemoryVaultStore(label = "memory-vault"): VaultStore {
+  let value: string | null = null;
+  return {
+    label,
+    async read() {
+      return value;
+    },
+    async write(next: string) {
+      value = next;
+    },
+    async remove() {
+      value = null;
+    },
+  };
+}
+
+export function createLocalStorageVaultStore(key: string, storage?: Storage): VaultStore {
+  const store = storage ?? getDefaultStorage();
+  if (!store) {
+    throw new VaultError("localStorage is not available in this environment");
+  }
+  return {
+    label: key,
+    async read() {
+      return store.getItem(key);
+    },
+    async write(next) {
+      store.setItem(key, next);
+    },
+    async remove() {
+      store.removeItem(key);
+    },
+  };
+}
+
+function getDefaultStorage(): Storage | undefined {
+  const anyGlobal = globalThis as typeof globalThis & { localStorage?: Storage };
+  return anyGlobal.localStorage;
+}
+
 function createKdfParams(
   overrides?: Readonly<{ N?: number; r?: number; p?: number; dkLen?: number }>,
 ): VaultKdfParams {
@@ -291,10 +304,10 @@ function createKdfParams(
     p: overrides?.p ?? DEFAULT_SCRYPT_PARAMS.p,
     dkLen: overrides?.dkLen ?? DEFAULT_SCRYPT_PARAMS.dkLen,
   };
-  const salt = randomBytes(16);
+  const salt = getRandomBytes(16);
   return {
     ...params,
-    saltBase64: salt.toString("base64"),
+    saltBase64: bytesToBase64(salt),
   };
 }
 
@@ -309,42 +322,54 @@ function createEmptyVault(params: VaultKdfParams): VaultFile {
   };
 }
 
-async function deriveKey(passphrase: string, params: VaultKdfParams): Promise<Buffer> {
-  const salt = Buffer.from(params.saltBase64, "base64");
-  const derived = await scryptAsync(passphrase, salt, params.dkLen, {
+async function deriveKey(passphrase: string, params: VaultKdfParams): Promise<Uint8Array> {
+  const salt = base64ToBytes(params.saltBase64);
+  return scrypt(utf8ToBytes(passphrase), salt, {
     N: params.N,
     r: params.r,
     p: params.p,
+    dkLen: params.dkLen,
   });
-  return Buffer.isBuffer(derived) ? derived : Buffer.from(derived as ArrayBuffer);
 }
 
-function encryptSeed(seed: string, key: Buffer): VaultEntryEncrypted {
-  const nonce = randomBytes(AES_GCM_NONCE_BYTES);
-  const cipher = createCipheriv("aes-256-gcm", key, nonce);
-  const ciphertext = Buffer.concat([cipher.update(seed, "utf8"), cipher.final()]);
-  const tag = cipher.getAuthTag();
+async function encryptSeed(seed: string, key: Uint8Array): Promise<VaultEntryEncrypted> {
+  const crypto = await getCrypto();
+  const nonce = getRandomBytes(AES_GCM_NONCE_BYTES);
+  const cryptoKey = await crypto.subtle.importKey("raw", toArrayBuffer(key), "AES-GCM", false, [
+    "encrypt",
+  ]);
+  const ciphertextAndTag = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv: toArrayBuffer(nonce), tagLength: 128 },
+    cryptoKey,
+    toArrayBuffer(utf8ToBytes(seed)),
+  );
+  const bytes = new Uint8Array(ciphertextAndTag);
+  const ciphertext = bytes.slice(0, bytes.length - AES_GCM_TAG_BYTES);
+  const tag = bytes.slice(bytes.length - AES_GCM_TAG_BYTES);
   return {
-    nonceBase64: nonce.toString("base64"),
-    ciphertextBase64: ciphertext.toString("base64"),
-    tagBase64: tag.toString("base64"),
+    nonceBase64: bytesToBase64(nonce),
+    ciphertextBase64: bytesToBase64(ciphertext),
+    tagBase64: bytesToBase64(tag),
   };
 }
 
-function decryptSeed(encrypted: VaultEntryEncrypted, key: Buffer): string {
-  const nonce = Buffer.from(encrypted.nonceBase64, "base64");
-  const ciphertext = Buffer.from(encrypted.ciphertextBase64, "base64");
-  const tag = Buffer.from(encrypted.tagBase64, "base64");
-  const decipher = createDecipheriv("aes-256-gcm", key, nonce);
-  decipher.setAuthTag(tag);
-  const clear = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
-  return clear.toString("utf8");
-}
-
-async function writeVaultFile(path: string, file: VaultFile): Promise<void> {
-  const tmpPath = `${path}.tmp`;
-  await writeFile(tmpPath, JSON.stringify(file, null, 2), "utf8");
-  await rename(tmpPath, path);
+async function decryptSeed(encrypted: VaultEntryEncrypted, key: Uint8Array): Promise<string> {
+  const crypto = await getCrypto();
+  const nonce = base64ToBytes(encrypted.nonceBase64);
+  const ciphertext = base64ToBytes(encrypted.ciphertextBase64);
+  const tag = base64ToBytes(encrypted.tagBase64);
+  const combined = new Uint8Array(ciphertext.length + tag.length);
+  combined.set(ciphertext, 0);
+  combined.set(tag, ciphertext.length);
+  const cryptoKey = await crypto.subtle.importKey("raw", toArrayBuffer(key), "AES-GCM", false, [
+    "decrypt",
+  ]);
+  const clear = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: toArrayBuffer(nonce), tagLength: 128 },
+    cryptoKey,
+    toArrayBuffer(combined),
+  );
+  return bytesToUtf8(new Uint8Array(clear));
 }
 
 function parseVaultFile(raw: string): VaultFile {
@@ -358,72 +383,45 @@ function parseVaultFile(raw: string): VaultFile {
   return parsed;
 }
 
-function isNotFoundError(error: unknown): error is { code: string } {
-  if (!error || typeof error !== "object" || !("code" in error)) return false;
-  const code = (error as { code?: unknown }).code;
-  return typeof code === "string" && code === "ENOENT";
+async function getCrypto(): Promise<Crypto> {
+  if (globalThis.crypto?.subtle) return globalThis.crypto;
+  throw new VaultError("WebCrypto is not available in this environment");
 }
 
-export async function vaultExists(path: string): Promise<boolean> {
-  try {
-    await access(path);
-    return true;
-  } catch {
-    return false;
+function getRandomBytes(length: number): Uint8Array<ArrayBuffer> {
+  const crypto = globalThis.crypto;
+  if (!crypto?.getRandomValues) {
+    throw new VaultError("crypto.getRandomValues is not available");
   }
+  const bytes = new Uint8Array(new ArrayBuffer(length));
+  crypto.getRandomValues(bytes);
+  return bytes;
 }
 
-async function acquireLock(
-  path: string,
-  timeoutMs: number,
-): Promise<Awaited<ReturnType<typeof open>>> {
-  const start = Date.now();
-  const retryMs = 200;
-  while (true) {
-    try {
-      const handle = await open(path, "wx");
-      await handle.writeFile(
-        JSON.stringify({ pid: process.pid, createdAt: new Date().toISOString() }, null, 2),
-        "utf8",
-      );
-      return handle;
-    } catch (error) {
-      if (!isLockExistsError(error)) throw error;
-      if (timeoutMs <= 0 || Date.now() - start >= timeoutMs) {
-        throw new VaultError(`Vault is locked: ${path}`);
-      }
-      await new Promise((resolve) => setTimeout(resolve, retryMs));
-    }
+function bytesToBase64(bytes: Uint8Array): string {
+  if (typeof Buffer !== "undefined") return Buffer.from(bytes).toString("base64");
+  let binary = "";
+  for (const b of bytes) binary += String.fromCharCode(b);
+  return btoa(binary);
+}
+
+function base64ToBytes(base64: string): Uint8Array<ArrayBuffer> {
+  if (typeof Buffer !== "undefined") {
+    const buf = Buffer.from(base64, "base64");
+    return new Uint8Array(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
   }
+  const binary = atob(base64);
+  const bytes = new Uint8Array(new ArrayBuffer(binary.length));
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
 }
 
-async function releaseLock(
-  handle: Awaited<ReturnType<typeof open>> | undefined,
-  path: string,
-): Promise<void> {
-  if (!handle) return;
-  try {
-    await handle.close();
-  } finally {
-    await unlink(path).catch(() => undefined);
-  }
+function bytesToUtf8(bytes: Uint8Array): string {
+  return new TextDecoder().decode(bytes);
 }
 
-function isLockExistsError(error: unknown): boolean {
-  if (!error || typeof error !== "object" || !("code" in error)) return false;
-  const code = (error as { code?: unknown }).code;
-  return typeof code === "string" && code === "EEXIST";
-}
-
-const exitHandlers = new Set<() => Promise<void>>();
-
-function registerExitHandler(fn: () => Promise<void>): void {
-  exitHandlers.add(fn);
-  if (exitHandlers.size === 1) {
-    process.on("exit", () => {
-      for (const handler of exitHandlers) {
-        handler().catch(() => undefined);
-      }
-    });
-  }
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const out = new Uint8Array(new ArrayBuffer(bytes.byteLength));
+  out.set(bytes);
+  return out.buffer;
 }

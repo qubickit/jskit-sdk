@@ -112,10 +112,14 @@ const targetTick = await sdk.tick.getSuggestedTargetTick(); // currentTick + 15
 // const fees = await sdkWithQbi.qbi?.contract("QUtil").query("GetFees", { inputBytes: new Uint8Array([0]) });
 // queryValue returns decoded outputs when codecs are configured (see docs).
 
-// Seed vault integration
+// Seed vault integration (Node)
 // const vault = await openSeedVault({ path: "./vault.json", passphrase: "secret", create: true });
 // const sdkWithVault = createSdk({ baseUrl: "https://rpc.qubic.org", vault });
 // const fromSeed = await sdkWithVault.vault?.getSeed("main");
+
+// Seed vault integration (Browser)
+// const store = createLocalStorageVaultStore("qubic.vault");
+// const vault = await openSeedVaultBrowser({ store, passphrase: "secret", create: true });
 // await sdkWithVault.transfers.sendAndConfirm({ fromSeed, toIdentity, amount: 1n, targetTick });
 // await sdkWithVault.transfers.sendAndConfirm({ fromVault: "main", toIdentity, amount: 1n, targetTick });
 // await sdkWithVault.transfers.sendAndConfirmFromVault({ fromVault: "main", toIdentity, amount: 1n, targetTick });

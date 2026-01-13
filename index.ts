@@ -134,13 +134,18 @@ export type {
   VaultEntry,
   VaultExport,
   VaultSummary,
-} from "./src/vault.js";
+} from "./src/vault/types.js";
 export {
-  openSeedVault,
   VaultEntryExistsError,
   VaultEntryNotFoundError,
   VaultError,
   VaultInvalidPassphraseError,
   VaultNotFoundError,
-  vaultExists,
-} from "./src/vault.js";
+} from "./src/vault/types.js";
+export { openSeedVault, vaultExists } from "./src/vault.js";
+export type { OpenSeedVaultBrowserInput, VaultStore } from "./src/vault-browser.js";
+export {
+  createLocalStorageVaultStore,
+  createMemoryVaultStore,
+  openSeedVaultBrowser,
+} from "./src/vault-browser.js";

@@ -12,7 +12,7 @@ import { createTxConfirmationHelpers } from "./tx/confirm.js";
 import { createTxHelpers } from "./tx/tx.js";
 import type { TxQueuePolicy } from "./tx/tx-queue.js";
 import { TxQueue } from "./tx/tx-queue.js";
-import type { SeedVault } from "./vault.js";
+import type { SeedVault } from "./vault/types.js";
 
 export type SdkConfig = Readonly<{
   /** Partner RPC base URL (recommended: `https://rpc.qubic.org`). */

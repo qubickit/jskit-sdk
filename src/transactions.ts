@@ -10,7 +10,7 @@ import type { BroadcastTransactionResult, QueryTransaction } from "./rpc/client.
 import type { TickHelpers } from "./tick.js";
 import type { TxHelpers } from "./tx/tx.js";
 import type { TxQueue } from "./tx/tx-queue.js";
-import type { SeedVault } from "./vault.js";
+import type { SeedVault } from "./vault/types.js";
 
 export type TransactionHelpersConfig = Readonly<{
   tick: TickHelpers;
