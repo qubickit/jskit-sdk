@@ -1,14 +1,12 @@
-import { scrypt } from "@noble/hashes/scrypt";
-import { utf8ToBytes } from "@noble/hashes/utils";
 import { identityFromSeed } from "@qubic-labs/core";
 import type {
-  OpenSeedVaultInput,
+  Pbkdf2Hash,
+  Pbkdf2KdfParams,
   SeedVault,
   VaultEntry,
   VaultEntryEncrypted,
   VaultExport,
   VaultHeader,
-  VaultKdfParams,
   VaultSummary,
 } from "./vault/types.js";
 import {
@@ -19,10 +17,9 @@ import {
   VaultNotFoundError,
 } from "./vault/types.js";
 
-const DEFAULT_SCRYPT_PARAMS = Object.freeze({
-  N: 1 << 13,
-  r: 8,
-  p: 1,
+const DEFAULT_PBKDF2_PARAMS = Object.freeze({
+  iterations: 200_000,
+  hash: "SHA-256" as Pbkdf2Hash,
   dkLen: 32,
 });
 
@@ -30,7 +27,14 @@ const AES_GCM_NONCE_BYTES = 12;
 const AES_GCM_TAG_BYTES = 16;
 const VAULT_VERSION = 1;
 
-type VaultFile = VaultHeader & Readonly<{ entries: readonly VaultEntry[] }>;
+type VaultFile = Omit<VaultHeader, "kdf"> &
+  Readonly<{
+    kdf: Readonly<{
+      name: "pbkdf2";
+      params: Pbkdf2KdfParams;
+    }>;
+    entries: readonly VaultEntry[];
+  }>;
 
 export type VaultStore = Readonly<{
   read(): Promise<string | null>;
@@ -39,14 +43,18 @@ export type VaultStore = Readonly<{
   label?: string;
 }>;
 
-export type OpenSeedVaultBrowserInput = Omit<
-  OpenSeedVaultInput,
-  "path" | "lock" | "lockTimeoutMs"
-> &
-  Readonly<{
-    store: VaultStore;
-    path?: string;
+export type OpenSeedVaultBrowserInput = Readonly<{
+  passphrase: string;
+  create?: boolean;
+  autoSave?: boolean;
+  kdfParams?: Readonly<{
+    iterations?: number;
+    hash?: Pbkdf2Hash;
+    dkLen?: number;
   }>;
+  store: VaultStore;
+  path?: string;
+}>;
 
 export async function openSeedVaultBrowser(input: OpenSeedVaultBrowserInput): Promise<SeedVault> {
   const { store, passphrase } = input;
@@ -180,7 +188,7 @@ export async function openSeedVaultBrowser(input: OpenSeedVaultBrowserInput): Pr
 
     file = {
       vaultVersion: VAULT_VERSION,
-      kdf: { name: "scrypt", params },
+      kdf: { name: "pbkdf2", params },
       entries: Array.from(entries.values()),
     };
     key = nextKey;
@@ -201,6 +209,9 @@ export async function openSeedVaultBrowser(input: OpenSeedVaultBrowserInput): Pr
     options?: Readonly<{ mode?: "merge" | "replace"; sourcePassphrase?: string }>,
   ): Promise<void> => {
     const source = typeof inputExport === "string" ? parseVaultFile(inputExport) : inputExport;
+    if (source.kdf.name !== "pbkdf2") {
+      throw new VaultError("Unsupported KDF");
+    }
     const sourceKey = await deriveKey(options?.sourcePassphrase ?? passphrase, source.kdf.params);
     const mode = options?.mode ?? "merge";
     const now = new Date().toISOString();
@@ -296,13 +307,12 @@ function getDefaultStorage(): Storage | undefined {
 }
 
 function createKdfParams(
-  overrides?: Readonly<{ N?: number; r?: number; p?: number; dkLen?: number }>,
-): VaultKdfParams {
+  overrides?: Readonly<{ iterations?: number; hash?: Pbkdf2Hash; dkLen?: number }>,
+): Pbkdf2KdfParams {
   const params = {
-    N: overrides?.N ?? DEFAULT_SCRYPT_PARAMS.N,
-    r: overrides?.r ?? DEFAULT_SCRYPT_PARAMS.r,
-    p: overrides?.p ?? DEFAULT_SCRYPT_PARAMS.p,
-    dkLen: overrides?.dkLen ?? DEFAULT_SCRYPT_PARAMS.dkLen,
+    iterations: overrides?.iterations ?? DEFAULT_PBKDF2_PARAMS.iterations,
+    hash: overrides?.hash ?? DEFAULT_PBKDF2_PARAMS.hash,
+    dkLen: overrides?.dkLen ?? DEFAULT_PBKDF2_PARAMS.dkLen,
   };
   const salt = getRandomBytes(16);
   return {
@@ -311,36 +321,47 @@ function createKdfParams(
   };
 }
 
-function createEmptyVault(params: VaultKdfParams): VaultFile {
+function createEmptyVault(params: Pbkdf2KdfParams): VaultFile {
   return {
     vaultVersion: VAULT_VERSION,
     kdf: {
-      name: "scrypt",
+      name: "pbkdf2",
       params,
     },
     entries: [],
   };
 }
 
-async function deriveKey(passphrase: string, params: VaultKdfParams): Promise<Uint8Array> {
+async function deriveKey(passphrase: string, params: Pbkdf2KdfParams): Promise<CryptoKey> {
+  const crypto = await getCrypto();
   const salt = base64ToBytes(params.saltBase64);
-  return scrypt(utf8ToBytes(passphrase), salt, {
-    N: params.N,
-    r: params.r,
-    p: params.p,
-    dkLen: params.dkLen,
-  });
+  const baseKey = await crypto.subtle.importKey(
+    "raw",
+    toArrayBuffer(utf8ToBytes(passphrase)),
+    "PBKDF2",
+    false,
+    ["deriveKey"],
+  );
+  return crypto.subtle.deriveKey(
+    {
+      name: "PBKDF2",
+      salt: toArrayBuffer(salt),
+      iterations: params.iterations,
+      hash: params.hash,
+    },
+    baseKey,
+    { name: "AES-GCM", length: params.dkLen * 8 },
+    false,
+    ["encrypt", "decrypt"],
+  );
 }
 
-async function encryptSeed(seed: string, key: Uint8Array): Promise<VaultEntryEncrypted> {
+async function encryptSeed(seed: string, key: CryptoKey): Promise<VaultEntryEncrypted> {
   const crypto = await getCrypto();
   const nonce = getRandomBytes(AES_GCM_NONCE_BYTES);
-  const cryptoKey = await crypto.subtle.importKey("raw", toArrayBuffer(key), "AES-GCM", false, [
-    "encrypt",
-  ]);
   const ciphertextAndTag = await crypto.subtle.encrypt(
     { name: "AES-GCM", iv: toArrayBuffer(nonce), tagLength: 128 },
-    cryptoKey,
+    key,
     toArrayBuffer(utf8ToBytes(seed)),
   );
   const bytes = new Uint8Array(ciphertextAndTag);
@@ -353,7 +374,7 @@ async function encryptSeed(seed: string, key: Uint8Array): Promise<VaultEntryEnc
   };
 }
 
-async function decryptSeed(encrypted: VaultEntryEncrypted, key: Uint8Array): Promise<string> {
+async function decryptSeed(encrypted: VaultEntryEncrypted, key: CryptoKey): Promise<string> {
   const crypto = await getCrypto();
   const nonce = base64ToBytes(encrypted.nonceBase64);
   const ciphertext = base64ToBytes(encrypted.ciphertextBase64);
@@ -361,12 +382,9 @@ async function decryptSeed(encrypted: VaultEntryEncrypted, key: Uint8Array): Pro
   const combined = new Uint8Array(ciphertext.length + tag.length);
   combined.set(ciphertext, 0);
   combined.set(tag, ciphertext.length);
-  const cryptoKey = await crypto.subtle.importKey("raw", toArrayBuffer(key), "AES-GCM", false, [
-    "decrypt",
-  ]);
   const clear = await crypto.subtle.decrypt(
     { name: "AES-GCM", iv: toArrayBuffer(nonce), tagLength: 128 },
-    cryptoKey,
+    key,
     toArrayBuffer(combined),
   );
   return bytesToUtf8(new Uint8Array(clear));
@@ -377,7 +395,7 @@ function parseVaultFile(raw: string): VaultFile {
   if (!parsed || typeof parsed !== "object") {
     throw new VaultError("Invalid vault file");
   }
-  if (!parsed.kdf || parsed.kdf.name !== "scrypt") {
+  if (!parsed.kdf || parsed.kdf.name !== "pbkdf2") {
     throw new VaultError("Unsupported KDF");
   }
   return parsed;
@@ -418,6 +436,10 @@ function base64ToBytes(base64: string): Uint8Array<ArrayBuffer> {
 
 function bytesToUtf8(bytes: Uint8Array): string {
   return new TextDecoder().decode(bytes);
+}
+
+function utf8ToBytes(value: string): Uint8Array {
+  return new TextEncoder().encode(value);
 }
 
 function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {

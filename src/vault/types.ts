@@ -1,4 +1,4 @@
-export type VaultKdfParams = Readonly<{
+export type ScryptKdfParams = Readonly<{
   N: number;
   r: number;
   p: number;
@@ -6,12 +6,30 @@ export type VaultKdfParams = Readonly<{
   saltBase64: string;
 }>;
 
+export type Pbkdf2Hash = "SHA-256" | "SHA-384" | "SHA-512";
+
+export type Pbkdf2KdfParams = Readonly<{
+  iterations: number;
+  hash: Pbkdf2Hash;
+  dkLen: number;
+  saltBase64: string;
+}>;
+
+export type VaultKdfParams = ScryptKdfParams | Pbkdf2KdfParams;
+
+export type VaultKdf =
+  | Readonly<{
+      name: "scrypt";
+      params: ScryptKdfParams;
+    }>
+  | Readonly<{
+      name: "pbkdf2";
+      params: Pbkdf2KdfParams;
+    }>;
+
 export type VaultHeader = Readonly<{
   vaultVersion: number;
-  kdf: Readonly<{
-    name: "scrypt";
-    params: VaultKdfParams;
-  }>;
+  kdf: VaultKdf;
 }>;
 
 export type VaultEntryEncrypted = Readonly<{

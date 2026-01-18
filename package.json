@@ -39,8 +39,7 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@qubic-labs/core": "^1.0.3",
-    "@noble/hashes": "^1.8.0"
+    "@qubic-labs/core": "^1.0.3"
   },
   "peerDependencies": {
     "typescript": "^5"

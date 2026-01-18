@@ -3,12 +3,12 @@ import { access, open, readFile, rename, unlink, writeFile } from "node:fs/promi
 import { identityFromSeed } from "@qubic-labs/core";
 import type {
   OpenSeedVaultInput,
+  ScryptKdfParams,
   SeedVault,
   VaultEntry,
   VaultEntryEncrypted,
   VaultExport,
   VaultHeader,
-  VaultKdfParams,
   VaultSummary,
 } from "./vault/types.js";
 import {
@@ -45,7 +45,14 @@ const DEFAULT_SCRYPT_PARAMS = Object.freeze({
 const AES_GCM_NONCE_BYTES = 12;
 const VAULT_VERSION = 1;
 
-type VaultFile = VaultHeader & Readonly<{ entries: readonly VaultEntry[] }>;
+type VaultFile = Omit<VaultHeader, "kdf"> &
+  Readonly<{
+    kdf: Readonly<{
+      name: "scrypt";
+      params: ScryptKdfParams;
+    }>;
+    entries: readonly VaultEntry[];
+  }>;
 
 export async function openSeedVault(input: OpenSeedVaultInput): Promise<SeedVault> {
   const { path, passphrase } = input;
@@ -220,6 +227,9 @@ export async function openSeedVault(input: OpenSeedVaultInput): Promise<SeedVaul
     options?: Readonly<{ mode?: "merge" | "replace"; sourcePassphrase?: string }>,
   ): Promise<void> => {
     const source = typeof inputExport === "string" ? parseVaultFile(inputExport) : inputExport;
+    if (source.kdf.name !== "scrypt") {
+      throw new VaultError("Unsupported KDF");
+    }
     const sourceKey = await deriveKey(options?.sourcePassphrase ?? passphrase, source.kdf.params);
     const mode = options?.mode ?? "merge";
     const now = new Date().toISOString();
@@ -284,7 +294,7 @@ export async function openSeedVault(input: OpenSeedVaultInput): Promise<SeedVaul
 
 function createKdfParams(
   overrides?: Readonly<{ N?: number; r?: number; p?: number; dkLen?: number }>,
-): VaultKdfParams {
+): ScryptKdfParams {
   const params = {
     N: overrides?.N ?? DEFAULT_SCRYPT_PARAMS.N,
     r: overrides?.r ?? DEFAULT_SCRYPT_PARAMS.r,
@@ -298,7 +308,7 @@ function createKdfParams(
   };
 }
 
-function createEmptyVault(params: VaultKdfParams): VaultFile {
+function createEmptyVault(params: ScryptKdfParams): VaultFile {
   return {
     vaultVersion: VAULT_VERSION,
     kdf: {
@@ -309,7 +319,7 @@ function createEmptyVault(params: VaultKdfParams): VaultFile {
   };
 }
 
-async function deriveKey(passphrase: string, params: VaultKdfParams): Promise<Buffer> {
+async function deriveKey(passphrase: string, params: ScryptKdfParams): Promise<Buffer> {
   const salt = Buffer.from(params.saltBase64, "base64");
   const derived = await scryptAsync(passphrase, salt, params.dkLen, {
     N: params.N,
