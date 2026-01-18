@@ -1,3 +1,13 @@
+## [2.0.0](https://github.com/qubickit/jskit-sdk/compare/v1.3.1...v2.0.0) (2026-01-18)
+
+### ⚠ BREAKING CHANGES
+
+* use webcrypto pbkdf2 in browser vault
+
+### Code Refactoring
+
+* use webcrypto pbkdf2 in browser vault ([55790b1](https://github.com/qubickit/jskit-sdk/commit/55790b118020f6caf77c47ff8baca8c4f628d140))
+
 ## [1.3.1](https://github.com/qubickit/jskit-sdk/compare/v1.3.0...v1.3.1) (2026-01-13)
 
 ### Bug Fixes
